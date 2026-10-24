@@ -1,0 +1,147 @@
+# Shown on Purpose {#sec-appearance}
+
+A type that cannot show itself is a schema with no error messages. The
+same instinct that wants a parser at the boundary wants a view at the
+boundary. Structure, validity, and presentation are one design surface,
+split into layers so they can change at different speeds.
+
+R gets you part of the way by cultural habit. `print`, `format`, and
+`str` are generics, so a class can own its appearance without owning the
+console. [cli](https://cli.r-lib.org/) raised the ceiling: a package can
+look like a small text interface, with semantic roles for alerts,
+progress, and inline values, instead of a pile of pasted strings. You can
+tell a finished package by the console. The unfinished ones dump
+`print.default` and apologize with a vignette.
+
+PowerShell gets you the rest of the idea, and then shows you how an idea
+can outlive its file format.
+
+## The pipe carries objects
+
+Jeffrey Snover wrote the Monad manifesto on 8 August 2002. The public
+copy lives on
+[Microsoft Learn](https://learn.microsoft.com/en-us/powershell/scripting/developer/monad-manifesto)
+and as a
+[PDF](https://jsnover.com/Docs/MonadManifesto.pdf). The sentence that
+matters, against a tradition of "prayer-based parsing" of text:
+
+> Instead of piping unstructured text, we pipe .NET objects.
+
+Downstream commands reflect on those objects. `Format-Table` is a command
+at the end of the pipeline, not a conversion that happens in the middle.
+The manifesto is explicit that once you have rendered text, you are back
+in the world of prayer. Formatting is a host concern. The objects survive
+until the host.
+
+That is the alignment with the R taste, and it is worth saying without
+irony. The substrate is a large, formally specified object runtime. The
+experience on top is a shell: verbs, pipelines, streams, discoverable
+help. The object model is the backbone. It is not the user interface.
+R's version is less formal and strangely similar. SEXPs are the backbone.
+Functions are the user interface. `print` is what the host does when the
+pipeline ends and a human is watching.
+
+## Format data is a view contract
+
+`Format.ps1xml` files, and the views that replaced them, declare how a
+type is shown: a table, a list, a wide view, a custom view. The official
+description is
+[about_Format.ps1xml](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_format.ps1xml).
+The important sentence in that document: the formatting affects the
+display only. It does not change which properties flow down the pipeline.
+
+Beginning in PowerShell 6, the built-in views moved into the source code.
+The XML files from Windows PowerShell 5.1 are not how the default views
+are defined anymore. Custom `Format.ps1xml` files still work, and
+`Update-FormatData` still loads them. The file format is the part that
+aged. The separation did not. Wanting the idea "revamped into something
+better" is in agreement with the direction the shell already took. Keep
+the contract --- a declarative view, distinct from the value, swappable
+by the host --- and retire the ceremony that got you there in 2006.
+
+The Extended Type System is the companion move. ETS can adapt how a type
+presents members and type names without you owning the class, which is
+how a shell stays useful in a world of ADO tables, WMI objects, and XML
+whose reflected shapes are not the shapes a human wants. The manifesto
+calls the piece an extended type reflector. You do not subclass
+`FileInfo` to make `Get-ChildItem` show `Length` and `LastWriteTime`.
+You project it.
+
+S3 generics are a cousin of that reflector. `format.my_class` adds a view
+from outside the value. What R never grew is the declarative pack: a
+data file, reviewed like data, that says "this class renders like so in
+a console, and like so in a markdown table," without the rendering buried
+in a method that mixes policy with string concatenation. cli themes and
+format methods are the craft version. They work. They are code, so they
+are harder to swap per host than a view definition would be. If you ever
+build the missing piece, build it as data. The method can interpret the
+data. The data should be the design.
+
+## A short, unromantic history
+
+The affection for this design sometimes gets told as a single arrow from
+Cairo to Longhorn to WinFS to .NET to PowerShell. The arrow is a mood,
+not a genealogy, and the mood survives a more accurate story.
+
+COM gave Windows a binary notion of interface identity. `IUnknown`,
+vtables, reference counts, a contract you could implement from more than
+one language. It also gave the industry DLL hell. The idea that survived
+is metadata and interfaces, not the binary layout.
+
+Cairo was an early-1990s attempt at an object-oriented operating system.
+It did not ship as conceived. Pieces of the thinking scattered into later
+Windows. It is not the parent of the CLR.
+
+Longhorn's WinFS was an attempt to make the filesystem a store of typed
+items. It was cut. It did not grow up into .NET. The dream --- systems
+that speak in typed items rather than opaque files --- is a recurring
+Microsoft dream, and it has failed as a product more than once. The
+failure does not make the dream stupid. It makes it a bad causal claim.
+
+.NET is a managed runtime with serious metadata, designed around the turn
+of the century, informed by COM's successes and scars and by other
+language runtimes. PowerShell is Monad: Snover's bet that an
+administrative shell on that runtime should pipe objects and format at
+the edge. That bet shipped. It is the piece you can actually learn from,
+because it has docs, an object pipeline, streams, and a view layer you
+can point at.
+
+Take the aesthetic and leave the arrow. Typed meaning in the middle.
+Declarative projection at the host. Mutation and I/O quarantined. The
+backbone can be SEXPs and generics, or CLR metadata and ETS. The shape of
+the program is the part worth copying.
+
+DSC, mentioned in the same breath, is the instinct aimed at desired state
+instead of desired display: say what should be true, let the system
+converge. It is a different feature and the same love of declarative
+descriptions. This book does not have a chapter on configuration
+management. It has a chapter on the love.
+
+## What to do in an R package this week
+
+You do not have format data. You have generics and cli. Use them as if
+the view were a contract.
+
+- Write `format.<class>` to return a character vector of the meaning, not
+  a dump of the slots. One line if the value is a fact. A short block if
+  the value is a document.
+- Write `print.<class>` as a thin caller of `format`, returning the value
+  invisibly, so the REPL stays a conversation.
+- Use cli for situations: alerts, progress, inline code and values. Give
+  the output semantic roles so a theme can restyle it.
+- Keep the view free of decisions. Formatting does not fetch, validate,
+  or mutate. If `print` has a side effect beyond writing, the contract is
+  already confused.
+- When a value has more than one useful projection --- a one-line summary,
+  a verbose dump, a markdown row --- make those named functions, not
+  flags buried in `print`. PowerShell's table-versus-list split is the
+  model. You can ship it as `format` and `format_details` long before you
+  have a view file format.
+
+And connect it back to streams. The view is what success looks like. The
+condition system is what the other channels look like. A package that
+formats its values and signals its situations, and never `cat()`s either,
+feels finished because both contracts are present. A package that only
+computes the right answer still feels like a sketch. The console is part
+of the product, especially in a language whose main instrument is a
+conversation.

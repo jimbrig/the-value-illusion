@@ -1,0 +1,14 @@
+"value illusion": The public story that ordinary R objects behave as values, sustained underneath by sharing, reference counts, and delayed copies.
+"cons cell": A heap node with a head, a tail, and an optional name. Pairlists and calls are chains of them.
+"generic vector": R's user-facing list. One header plus a contiguous array of SEXP pointers, type VECSXP.
+immortal: A node the collector must never free. Nil is the canonical case, pinned at the maximum reference count.
+"copy-on-modify": The rule that a shared ordinary vector is duplicated before a write, so other names keep the old value.
+"reference owner": An object whose identity is part of the API. Aliases observe the same evolving state.
+promise: A delayed argument. An expression plus an environment, forced at most once, then remembered.
+ALTREP: A framework for giving an ordinary SEXPTYPE a different payload, such as a compact sequence or a deferred string.
+condition: A classed signal. Handlers can run while the stack is still live, or they can unwind.
+restart: A named way to resume from a condition at the point where it was signaled, if the caller established one.
+"open verb": An operation that lives outside the type, so new nouns can join it and new verbs can be taught old nouns.
+"ubiquitous language": The curated names of a domain, shared by the code, the console, and the people who work in it.
+view: How a value is shown. A separate contract from what the value is.
+"functional core": The part of a program that decides on values. The imperative shell around it performs effects.

@@ -1,0 +1,103 @@
+/*-- scss:defaults --*/
+
+$primary: #9a5b2f;
+$content-max-width: 46rem;
+
+/*-- scss:rules --*/
+
+.quarto-title-block {
+  margin-bottom: 2.25rem;
+  border-bottom: 1px solid var(--bs-border-color);
+  padding-bottom: 1.25rem;
+}
+
+.quarto-title-block .quarto-title {
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.quarto-title-block .subtitle {
+  font-weight: 400;
+  max-width: 38rem;
+}
+
+main.content {
+  line-height: 1.7;
+}
+
+main.content > section > p,
+main.content > p,
+main.content li {
+  max-width: $content-max-width;
+}
+
+main.content h2 {
+  margin-top: 2.6rem;
+  letter-spacing: -0.02em;
+}
+
+main.content h3 {
+  margin-top: 2rem;
+}
+
+.epigraph {
+  max-width: $content-max-width;
+  margin: 0.25rem 0 1.75rem;
+  padding-left: 1rem;
+  border-left: 3px solid var(--bs-primary);
+  font-size: 1.12rem;
+  line-height: 1.55;
+}
+
+.epigraph p:last-child {
+  margin-bottom: 0;
+}
+
+.callout {
+  margin-block: 1.5rem;
+}
+
+.table {
+  margin-block: 1.5rem;
+}
+
+.table caption,
+caption {
+  color: var(--bs-secondary-color);
+  font-size: 0.925rem;
+  text-align: left;
+  caption-side: bottom;
+  padding-top: 0.5rem;
+}
+
+pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sidebar-title {
+  line-height: 1.2;
+}
+
+.glossary {
+  color: var(--bs-link-color);
+  background: transparent;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.15em;
+}
+
+.glossary:hover .def,
+.glossary:focus .def,
+.glossary:active .def {
+  display: inline-block;
+}
+
+@media (max-width: 767.98px) {
+  main.content {
+    line-height: 1.6;
+  }
+
+  .sourceCode {
+    font-size: 0.875rem;
+  }
+}

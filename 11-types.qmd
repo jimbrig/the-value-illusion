@@ -1,0 +1,162 @@
+# Types Without a Checker {#sec-types}
+
+The desire is not for a particular compiler. It is for the situation in
+which a name admits only the values that mean that name, in a shape you
+can rely on, with the structural work done by the runtime's garbage
+collector instead of by a borrow checker. Rust, Zod, Pydantic, an S3
+constructor ritual, and an S7 property are the same mental model at
+different distances from the bits. R's gap is that *defining* the type is
+not a pleasant, first-class act. You assemble it.
+
+That gap is not a reason to lower the standard. If the work is production
+work, invalid states are unrepresentable. "Mostly conventions" is how you
+describe a prototype, not a package other people call.
+
+## The ritual you have already been performing
+
+The S3 version of parse-don't-validate is a small protocol, repeated until
+it becomes muscle:
+
+- `new_*` builds the structure and does not check
+- `validate_*` states the laws and fails with a classed error
+- the user-facing constructor calls both, and is the only door
+- `as_*` coerces at the boundary and then goes through the door
+- `format_*` / `print` / `str` make the value legible
+
+That *is* "illegal states unrepresentable." It is unrepresentable by
+convention, which means a later edit can build the object through `new_*`
+and skip `validate_*`, and the type system will not notice. The protocol
+works in the packages where someone is strict about the doors. It drifts
+in the packages where the doors multiply.
+
+S7's contribution is not a new philosophy. It is a place to put the
+protocol so the drift has to work harder:
+
+- property contracts live on the property
+- joint laws live on the class validator
+- the constructor is the door
+- generics are a stronger dispatch story when the verbs and the nouns
+  both grow
+
+Its cost is authoring. Next to a Zod schema or a Pydantic model, an S7
+class is verbose, and the official examples often stop at `class_any`
+plus a check inside a method. That teaches the syntax. It does not teach
+the reason you reached for a class. The
+[S7 design notes](https://docs.jimbrig.com/s7-design-notes/) are the
+attempt to write the missing practice down: what knowledge the model
+carries, where a rule lives, when a property should itself be a class,
+how editable values differ from snapshots and from reference owners. This
+chapter will not repeat that book. It will connect it to the metal, and
+to the envy.
+
+## The envy is a diagnostic
+
+Zod and Pydantic make parsing the default gesture. You write the shape
+once. Construction fails or you hold a value. Consumers trust the type.
+The authoring experience is the feature. People adopt the library because
+the schema is shorter than the bugs it prevents, not because they read an
+essay about bounds.
+
+S7 can express the same designs. A property can name a class, a union, a
+base type, a validator, a getter, a setter. A class validator can state
+laws that mention more than one property. `convert` can sit at the edge
+where JSON becomes a domain value. The machinery is further along than
+the examples suggest. What is missing is the worn path: the way a
+competent author reaches for a reusable property the way a TypeScript
+author reaches for `z.number().int().min(0).max(255)`. Until that path
+exists, production S7 will keep looking under-typed, not because the
+objects cannot carry the law, but because `class_any` is the path of
+least resistance and the checks leak back into the methods.
+
+The metal already ratted this out. In the notebook, a property defined as
+`p = class_any` inspects as an `S7_property` record. The names visible in
+the dump include `name`, `class`, `getter`, `setter`, and `validator`.
+The record's length is 6; the paste elides one name, so this book will
+not invent it. The getter, setter, and validator slots in that particular
+property are Nil. `class` points at the empty `S7_any` vector. The
+structure for a real property contract is allocated. The example left it
+blank and postponed the law to whoever uses `p` later.
+
+That is the whole complaint, photographed. Filling those slots is the
+work. A scalar-or-null string is a type, expressed as a union or as a
+property validator, not as `class_any` followed by `if (!is.null(x))` in
+every method. An enum of five statuses is a class or a property whose
+validator knows the five strings, not a `character` and a prayer. A color
+with channels in `0:255` stores the channels under validators and exposes
+brightness as a getter, so brightness cannot drift out of agreement with
+the channels. An API response becomes one class per reusable object, with
+coercion at the edge and nowhere else.
+
+| The law | Where it lives |
+| --- | --- |
+| This field's shape, range, and presence | the property |
+| These fields together | the class validator |
+| Wire format into the domain | the constructor, or `convert`, at the boundary |
+| What we do when we talk to the world | verbs on a handle, or generics on the values |
+
+Checks inside methods rediscover the law at every call site. They do not
+compose. A property validator composes: every constructor, every
+replacement, every subclass that reuses the property, gets the same door.
+
+## S3 when you already own the ritual
+
+Use the manual protocol when the vocabulary is small, the type is a thin
+wrapper, and you already trust yourself to keep the doors closed. Use it
+when the community already speaks the class (`data.frame`, an httr2
+response) and a formal property model would be a translation nobody
+asked for. Use S7 when you are inventing the model: schemas, configs,
+enums, validated quantities, anything that will grow a second property
+and a third invariant. Use neither as a costume. An S7 class full of
+`class_any` is a list with a longer error message. An S3 class with no
+constructor is a string someone set an attribute on.
+
+The dispatch difference is real and secondary. S7's generics are a better
+instrument when verbs and nouns multiply. They do not fix a model that
+was never written. Choose S7 when you want the contracts attached to the
+object *and* you are willing to fill in the slots the dump already showed
+you. Choose S3 when the ritual is short enough to see in one screen and
+you will actually perform it.
+
+## Print methods are part of the type
+
+Hadley's packages are the existence proof that this is not academic. A
+finished type has a `format` that tells the truth in one line, a `print`
+that uses it, and a `str` that does not dump the SEXP. That is not
+decoration on top of an object system. It is how a value announces itself
+in the REPL, which is still where R is used, including by the person who
+wrote the package and has forgotten the shape. @sec-appearance pushes
+this further, toward views as a separate contract. For this chapter it is
+enough to say that a constructor without a format method is half a type.
+
+Functional composition is the other half of the same craft. Small verbs,
+each accepting a defended value and returning one, compose. A class
+hierarchy that you have to enter to get anything done does not compose
+with the pipe, the script, or the test. The OO in a good R package is the
+minimum that makes the verbs generic and the values meaningful. The rest
+is functions. That is a taste. It is also what the language is good at,
+once you stop apologizing for the missing checker and supply the parse
+yourself.
+
+## Where to spend the verbosity
+
+Verbose types and boring call sites means the bet paid off. Verbose call
+sites mean the rules were left in the methods. Move a constraint into a
+property until constructing the object feels as dull as calling
+`integer()`. Dull is the goal. The interesting thinking happens once,
+when you decide what the name admits, and then it stops happening in
+every function that receives one.
+
+Do not spend the verbosity on temporary lists inside a function. A local
+`list(a = 1, b = 2)` does not need a class. Spend it at boundaries: the
+wire, the file, the public argument, the value you put in a package's
+return position. Those are the places other code will otherwise
+rediscover the law, badly, under time pressure.
+
+The companion book works the design consequences in detail: property
+versus class, presence versus default, snapshots versus reference owners,
+the checking ladder, dispatch as a vocabulary of verbs. Start at the
+[overview](https://docs.jimbrig.com/s7-design-notes/00-overview.html) if
+you want that argument at full length. The claim this chapter adds is
+only that the runtime is not the obstacle. The authoring path is. The
+nodes will happily carry a strict model. Someone has to write the model
+as if the slots were the point, because they are.

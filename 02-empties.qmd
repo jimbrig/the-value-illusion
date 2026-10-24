@@ -1,0 +1,133 @@
+# Three Empties {#sec-empties}
+
+The first good hypothesis in the notebook was slightly too wide, and the
+next calls retired the extra width. That is the experiment working.
+
+The hypothesis, paraphrased from the comments: any genuinely empty thing
+is the same immortal `NILSXP` cell. `NULL`, `c()`, and `pairlist()`
+confirmed it, including under the strictest `identical()` switches, and
+including `extptr.as.ref = TRUE`. Same address. Same type code 0. `REF`
+pinned at the ceiling.
+
+Then `list()` and `alist()` printed a different address, type 19,
+`VECSXP`, length 0, empty flag bracket. Then `integer()`, `character()`,
+`double()`, `logical()`, `complex()`, and `raw()` each printed a
+zero-length vector of their own type. The hypothesis that survived is
+sharper than the one that was written down first.
+
+| Expression | SEXPTYPE | The Nil cell? | `typeof` |
+| --- | --- | --- | --- |
+| `NULL`, `c()`, `pairlist()` | `NILSXP` | yes, the only one | `"NULL"` |
+| `list()`, `alist()` | `VECSXP`, length 0 | no | `"list"` |
+| `integer()`, `character()`, … | a typed vector, length 0 | no | `"integer"`, `"character"`, … |
+
+Untyped *pairlist* emptiness collapses. Every other zero is a real node of
+its own type.
+
+## Why Nil gets to be the only one
+
+[R Internals](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#The-data)
+says there is only one object of type `NILSXP`, and it has no data. The
+constructor in `memory.c` is worth reading slowly:
+
+```c
+/* R_NilValue */
+/* THIS MUST BE THE FIRST CONS CELL ALLOCATED */
+/* OR ARMAGEDDON HAPPENS. */
+GET_FREE_NODE(R_NilValue);
+SET_REFCNT(R_NilValue, REFCNTMAX);
+SET_TYPEOF(R_NilValue, NILSXP);
+CAR0(R_NilValue) = R_NilValue;
+CDR(R_NilValue) = R_NilValue;
+TAG(R_NilValue) = R_NilValue;
+ATTRIB(R_NilValue) = R_NilValue;
+MARK_NOT_MUTABLE(R_NilValue);
+```
+
+It is a cons cell that points at itself in every direction, allocated
+before any other cons cell, with the reference count pinned and mutation
+forbidden. The write barrier refuses assignments into its fields. Empty
+hash buckets point at it. The empty formal list points at it. The end of
+every pairlist points at it. "No binding here," "no attribute," "no rest
+of this chain," and "the user said NULL" are the same node because the
+Lisp tradition this evaluator comes from treats the empty list and nil as
+one object, and because having two of them would make every `== R_NilValue`
+pointer check a lie.
+
+That is the sense in which Nil is special. Special does not mean "has a
+richer identity than a typed empty." It means the runtime has exactly one,
+forever, and a large amount of C code compares pointers against it. A
+typed empty is special in a different way: it is allowed to be nothing of
+a particular kind. Programs should imitate the second kind. A zero that
+still has a type is a value you can pass through `lapply`, attach a name
+to, and refuse to confuse with "the argument was missing."
+
+## Why `list()` refuses to collapse
+
+The tempting explanation is dispatch. `.S3PrimitiveGenerics` and
+`.internalGenerics` are right there in the notebook, and they look like a
+reason. They are a reason that some operations on vectors are wired into
+the primitive table for speed. They are not why the empty list has its own
+node.
+
+`list()` is a {{< glossary "generic vector" >}}. The manual's description
+of `VECSXP` is a header, a length, a true length, and a block of `SEXP`
+pointers. Length zero is a legitimate block. It has to be, because the
+zero of the user-facing heterogeneous container has to remain that
+container:
+
+- `typeof(list())` is `"list"`, and `length(list())` is 0
+- `is.null(list())` is `FALSE`, which a huge amount of real code depends on
+- you can set `names` on it, grow it with `[[<-`, and hand it to `lapply`
+- an empty list with no class is still not `NULL`, so the `OBJ` bit and
+  the class attribute stay out of the explanation
+
+Pairlists follow the other rule because they are cons chains. The empty
+chain *is* nil. `pairlist()` with no arguments returns `R_NilValue`. R
+kept that rule for the substrate --- formals, attributes, the tail of a
+call --- and grew a different empty for analysts.
+
+`alist()` is the subtle one. An alist is a list that can hold missing
+arguments; it is still a generic vector, not a pairlist. Empty, it is
+another zero-length `VECSXP`, at its own address. The name "alist" is
+historical. The representation is the vector world's.
+
+## Typed emptiness is a value
+
+`integer()` is not "nothing." It is a length-zero integer vector. Sum it,
+recycle it, bind it as a column, give it a class. `character()` is a
+length-zero `STRSXP`, which means a vector of `CHARSXP` pointers with no
+pointers in it. The R-level word is `"character"`. The C-level word is
+`STRSXP`. The single string inside a character vector is the thing called
+`CHARSXP`, and you almost never hold one of those at R level. The notebook
+guessed `STRSEXP`. Close, and the distinction matters the moment you read
+a header.
+
+`numeric()` is `double()` by another door. `typeof(numeric())` is
+`"double"`. There is no `NUMSXP`.
+
+This is also why `c()` with no arguments is Nil rather than "an empty
+atomic vector of unknown type." `c()` is the concatenator. Given nothing
+to concatenate and no type to inherit, it returns `NULL`. Given integers,
+it returns an integer vector. The empty call is the degenerate case of a
+function, not the zero of a type. `integer()` is the zero of a type. They
+answer different questions, and the dumps are the proof that R refuses to
+pretend they are the same question.
+
+## What people mean by "no scalars"
+
+S took a shortcut that still defines the language. Chambers describes it
+in the
+[2020 R Journal piece](https://journal.r-project.org/articles/RJ-2020-028/):
+there were not enough hands to build a language with scalars and also
+vectors, and the Fortran libraries underneath already thought in arrays.
+So the low-level scalar work stayed on the other side of the interface,
+and R inherited a world in which `1L` is an integer vector of length one.
+The `scalar` bit in the header is an optimization for that common case,
+not a new type.
+
+Typed emptiness is the dual of that decision. If everything is a vector,
+the empty vector has to exist, per type, or "zero of these" collapses into
+"absence" and absence already has a resident. Nil is absence. `integer()`
+is a count of zero. Keeping them apart is one of the few places R is
+stricter than its reputation.

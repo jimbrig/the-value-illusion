@@ -1,0 +1,133 @@
+# Where State Lives {#sec-containers}
+
+Statefulness is fine. Undeclared statefulness is what bites. Picking a
+container is picking where identity, validation, and lifetime live, and
+the runtime has already limited the menu. You do not invent a third
+physics. You choose a value or a handle, and you say so in the type.
+
+## Four questions
+
+Ask them in order.
+
+1. **Does anyone need to observe mutation of the same object?** An open
+   connection, a token that refreshes, a cache, a progress meter, a
+   conversation. Yes means a {{< glossary "reference owner" >}}: an
+   environment, an R6 object, an external pointer, or an S7 class that
+   has deliberately chosen environment physics. No means a value. Lists,
+   S3 objects, and ordinary S7 objects are values. Copy-on-modify is the
+   physics, whether you think about it or not.
+
+2. **Is this a domain fact or a process capability?** Config, enums,
+   colors, response schemas, and parsed documents are facts. They want
+   to be values, because you want to compare them, print them, and put
+   them in tests. "Talk to this API," "hold this socket," "retry with
+   backoff" are capabilities. They want a handle that *owns* or
+   *receives* values.
+
+3. **Who owns the lifetime?** Process-wide defaults belong in a small
+   package environment or in `options()`, documented, and treated as
+   defaults rather than as the real API. Per session, per test, per
+   request: construct the value or the handle and pass it. Hidden `<<-`
+   into a parent the caller cannot name is how a helper becomes a seance.
+
+4. **Where do the contracts live?** This is not "S7 or S3 depending on
+   how serious you are." Illegal states should be unrepresentable either
+   way. The question is whether the contract is a ritual you maintain
+   (`new_*`, `validate_*`, `as_*`, `format_*`) or a structure the object
+   carries (S7 properties, validators, generics). @sec-types takes that
+   fork. It does not weaken question 1.
+
+## A concrete map
+
+The API-shaped version, because it keeps coming up:
+
+| Thing | Container | Why |
+| --- | --- | --- |
+| `api_config`: base URL, timeouts, auth material, enums | S7 or S3 value | A snapshot. Cheap to compare. Easy to build in a test. No identity. |
+| `api_client`: request factory, token refresh, rate limit | R6, an environment, or a thin handle around httr2 | Identity matters. The token you refresh is the token the next call must see. |
+| Package default config | Locked package environment, or `options()` | Bootstrapping. Override by argument, not by a global write in the hot path. |
+| Call-site wiring | Pass the client in | Tests inject fakes. Scripts inject the real handle. |
+
+```text
+config   : value     what is true
+client   : handle    what can act
+functions: take the handle, and take config overrides as values
+package environment: defaults and registries only
+```
+
+The anti-pattern is one class that is both the config record and the live
+session. You then either mutate a thing that prints like a value, or you
+copy a thing that was supposed to be a handle and wonder why the refresh
+did not stick. The physics will not save you from that confusion. It will
+obey whichever choice you accidentally made.
+
+Gary Bernhardt's talk
+[Boundaries](https://www.destroyallsoftware.com/talks/boundaries) names the
+larger shape: a functional core that decides, an imperative shell that
+performs effects. In R the core is values and verbs. The shell is the
+handle, the `options()` read at the edge, the handler that decides how a
+condition is shown. "Functional core, imperative shell" is not a style
+for people who dislike objects. It is a rule for where objects with
+identity are allowed to stand.
+
+## Dependency injection without the enterprise voice
+
+Passing the client is dependency injection. You do not need a container
+framework. You need an argument.
+
+- **Package environment or options.** Defaults, feature flags, a memoised
+  registry, the current printing width. Ambient, documented, easy to
+  override in a test by setting the option inside `withr::with_options`
+  or by not reading the option when an argument was supplied.
+- **Arguments.** Anything that changes the correctness of a call. If a
+  test must swap it, it is an argument, or it is a field of a handle that
+  was built from an argument.
+- **The hybrid that stays sane.** `client <- api_client_new(config = api_config_default())`,
+  and `api_config_default()` reads the option once. Callers who care pass
+  a config they built themselves. Callers who do not care get the
+  default. Nobody reaches through `<<-`.
+
+This is also the answer to "a package environment versus a client that
+closes over the config." The package environment is a process-lifetime
+default. The client is a value you chose to give identity because it acts.
+Functions that quietly call `get_config()` from the package environment
+are hard to test and hard to reason about, and they feel convenient for
+exactly as long as you have one config. The day you have two --- prod and
+sandbox, this tenant and that tenant --- the hidden lookup becomes the
+bug.
+
+## Reactivity is the tell
+
+The notebook's guess about reference semantics was right, and it is the
+best reason to choose a handle on purpose. If a later step must observe
+that *this* object changed --- invalidate a cache, advance a progress
+bar, refresh a token that other calls share --- then identity is part of
+the feature. Values can imitate this with explicit returns and with
+reactive frameworks that diff old and new, and sometimes that imitation
+is the point. Shiny's reactive graph is a disciplined version. It is a
+lot of machinery to reach for when an environment would have been the
+honest model.
+
+The converse tell: if you never observe identity, a reference object is
+paying for a capability you do not use, and you are giving up the ability
+to treat the thing as a value in tests and in pipes. S7 getters and
+setters do not change this. A setter on a value returns a new value. A
+setter on a handle mutates. The syntax can be made to look similar. The
+addresses will not.
+
+## Superassignment, one last time
+
+`<<-` is the undeclared version of a handle. It can implement the same
+patterns, and people do, and the patterns work until the enclosure chain
+is not the one they imagined. Lexical scope is a feature when you are
+resolving a free variable on purpose. It is a liability when you are
+using it as a mutable store you refused to name.
+
+If you want the pattern "scratch space inside a function, value out," do
+that with a local environment and return a list or an S7 object. The
+environment dies with the call. The value carries the facts. That is the
+`ST` pattern from @sec-illusion, performed by hand, and it is a good
+pattern. The moment the environment is returned, or stored in the package
+environment, you have built a handle. Then name it as a handle and give
+it a type, so the next reader does not have to discover the identity by
+calling `lobstr::obj_addr`.

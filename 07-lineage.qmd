@@ -1,0 +1,143 @@
+# Lineage {#sec-lineage}
+
+R's oddness is not an accident that later programmers failed to clean up.
+It is a hybrid engineered for interactive data analysis, afterwards asked
+to carry production systems. The sophistication of the REPL and the
+friction of a hardened package are the same design, seen from two ends.
+
+## Three principles, visible from the first blackboard
+
+In a 2016 book Chambers claimed the design of R can be summarized in three
+principles. He repeated them, with the history attached, in
+[*S, R, and Data Science*](https://journal.r-project.org/articles/RJ-2020-028/)
+(*The R Journal*, 2020). The wording there:
+
+> objects: Everything that exists in R is an object.
+>
+> functions: Everything that happens in R is a function call.
+>
+> interfaces: Interfaces to other languages are a part of R.
+
+He is careful about the chronology. The principles were not invented late
+as a brand. They are "broadly visible from the first version of S." The
+May 1976 sketch he reprints is an interface: a Fortran subroutine on one
+side, an S object in, an S object out. Assignment is a function. Modeling
+returns an object. The user language looks like scientific expressions
+because the likely users were comfortable with scientific expressions, and
+because real analyses get tree-shaped fast. A colleague's suggestion of a
+shell of pipes was considered and declined. Pipes came back, decades
+later, as syntax over the function-call principle. They did not replace
+it.
+
+The scalar decision is in the same essay. S had no scalar types distinct
+from general objects, partly because the Fortran library already managed
+arrays, partly because there were not enough programmers to build a second
+language underneath. "The intention was that low-level computations
+depending on these would be done through the interface to Fortran." You
+are still living in that intention every time `1` is a vector.
+
+*Extending R* (Chapman and Hall/CRC, 2016) is the book the article cites
+for the principles, pages 4--11. The article is the piece you can actually
+open in a browser. Prefer it when you want the history; prefer the book
+when you want the design worked out as a programming model.
+
+## A Scheme engine asked to host S
+
+Ihaka and Gentleman's
+[1996 paper](https://doi.org/10.1080/10618600.1996.10474713) in the
+*Journal of Computational and Graphical Statistics* introduces R as a
+language for data analysis and graphics, in the S tradition, with lexical
+scope taken seriously. The
+[R Language Definition](https://cran.r-project.org/doc/manuals/r-release/R-lang.html)
+states the compromise in the introduction:
+
+> The language syntax has a superficial similarity with C, but the
+> semantics are of the FPL (functional programming language) variety with
+> stronger affinities with Lisp and APL. In particular, it allows
+> "computing on the language."
+
+Chapter 6 of the same manual is the part to sit with. R "presents a
+friendlier interface to programming than Lisp does, at least to someone
+used to mathematical formulas and C-like control structures, but the
+engine is really very Lisp-like." Calls are data. You can `quote` them,
+rearrange them, and `eval` them. Plot labels, model formulas, and tidy
+evaluation are applications of that fact. They are not a macro system
+bolted on later.
+
+What R borrowed, said plainly:
+
+| Ingredient | Where it came from | What it still feels like |
+| --- | --- | --- |
+| Vectors as the atom, no scalars | Fortran, S, an APL-shaped semantic habit | Recycling, vectorized math, `1` having a length |
+| `NA` as missingness in the runtime | S, and statistical practice | Missingness contaminates operations, on purpose |
+| Attributes, lists, data frames, S3 | S | Structure without a second object heap |
+| Pairlists, calls as data, `quote` / `eval` | Lisp | Metaprogramming, formulas, non-standard evaluation |
+| Lexical scope, closures, first-class functions | Scheme, a deliberate break from classic S | Factories, packages as namespaces, R6-via-environment |
+| A workspace and a search path | S, Bell Labs, interactive analysis | The REPL as the primary instrument |
+| Generic-function OOP | S, with CLOS in the air | Verbs that live outside objects |
+| Condition and restart machinery | Common Lisp, partially, and then a long cultural detour | Underused, next to `tryCatch` |
+| Lazy arguments | S and R's own mix | Defaults, NSE, the pass-by-value illusion |
+| Reference counts, ALTREP | R's own implementation lineage, Tierney and collaborators | Feels immutable, sometimes is not even allocated |
+| A serious collector and a byte compiler | Later R core work, Tierney central to it | A runtime that can carry the illusion |
+
+Luke Tierney's *Lisp-Stat* (Wiley, 1990) is a statistical environment built
+in Lisp, with dynamic graphics and objects, and Tierney later did an
+enormous share of R's runtime: the generational collector, the compiler,
+reference counting, ALTREP. Influence is not identity. R is not Lisp-Stat
+with different syntax. The accurate claim is smaller. The evaluator R
+shipped with is Scheme-descended, and the person who then made that
+evaluator industrially serious had already built a Lisp for statistics.
+You can feel both facts in the dumps. You should not cite them as one
+fact.
+
+## What the corpus said
+
+Morandat, Hill, Osvald, and Vitek,
+[Evaluating the Design of the R Language](https://doi.org/10.1007/978-3-642-31057-7_6)
+(ECOOP 2012), looked at the language the way language researchers look at
+a language: static and dynamic analysis of a large corpus. Their abstract
+is the quote to keep. R "combines lazy functional features and
+object-oriented programming. This rather unlikely linguistic cocktail
+would probably never have been prepared by computer scientists, yet the
+language has become surprisingly popular."
+
+The paper's lasting usefulness is the permission it gives you to treat the
+cocktail as a design you can evaluate, not as weather. Lazy promises,
+vectorization, a functional core, imperative locals, more than one object
+system, reflection into the implementation: users pick among these ad hoc,
+because the language permits all of them. That finding is still true, and
+it is the reason a package has to have an opinion. The language will not
+supply one.
+
+## Interfaces, including the ones that hurt
+
+The third Chambers principle is why `.Call`, Fortran, C++, Arrow, GDAL,
+and databases do not feel like foreign-function trivia in R. They feel
+like the original blackboard. The external pointer and the finalizer are
+the modern picture of that 1976 rectangle: something outside, an object
+on the way in, an object on the way out, and a question about who frees
+the memory.
+
+It is also why a `printf` inside that rectangle is a design bug rather
+than a logging strategy. The interface was supposed to exchange objects.
+Text on a C stream is a second language the caller did not agree to parse.
+@sec-signals already made this point from the condition side. From the
+historical side it is the same point. The interface is part of the
+language, so the interface has to speak the language.
+
+## A clash you can stop apologizing for
+
+C-like syntax, Lisp-like engine, Fortran-like data, statistical
+missingness, generic functions, and a reference-counted value illusion.
+None of these is a dialect you can subtract and still have R. The work is
+to know which one is speaking in a given line of code.
+
+A `LANGSXP` is the Lisp engine. A `REALSXP` is the Fortran data. An
+`ENVSXP` is the Scheme closure's home, and also R6's home. A promise is
+the calling convention that makes the REPL feel telepathic. `NA` is the
+statistical practice, built into the type rather than wrapped around it.
+`REF` is the modern implementation earning the value illusion the syntax
+has always sold. When a design argument in your package feels confused,
+it is often because two of these are being asked to answer the same
+question. Split the question. The lineage tells you which voice answers
+which one.

@@ -1,0 +1,151 @@
+# The REPL, Then the Contract {#sec-repl}
+
+The language definition describes the intended first experience in passing,
+and it is the whole product philosophy:
+
+> It is possible to get quite far using R interactively, executing simple
+> expressions from the command line. Some users may never need to go beyond
+> that level, others will want to write their own functions either in an ad
+> hoc fashion to systematize repetitive work or with the perspective of
+> writing add-on packages for new functionality.
+
+That ladder --- expression, function, package --- is the honest path. It
+is also why a person who wants illegal states to be unrepresentable feels
+like they are fighting the grain. They are. The grain is a conversation.
+Contracts are what you write down when the conversation has discovered a
+thing worth keeping.
+
+## What the conversation is good at
+
+Interactive data work wants:
+
+- load something real
+- poke it
+- draw it
+- summarize it
+- notice which poke you are about to repeat
+- wrap the repetition in a function
+- and, sometimes, put the function in a package so a stranger can call it
+
+Features that serve that ladder are easy to mistake for sloppiness.
+Promises let a plotting function capture the expression you wrote.
+Attributes let a vector grow a class without a new runtime type. The
+search path lets a new package's verbs appear in the conversation.
+Recycling and permissive coercion let a one-liner survive contact with a
+column that is *almost* the right shape. `NA` lets a summary skip missing
+measurements without a parallel `Option` type. Non-standard evaluation
+lets a modeling formula look like the thing a statistician would write on
+paper.
+
+Morandat and colleagues described this lifecycle as the context in which
+the linguistic cocktail makes sense. Take the lifecycle away and a lot of
+R looks indefensible. Leave it in place and the language looks like a
+tool that knows what the first hour of analysis is.
+
+## What the conversation will not do for you
+
+The same features are anti-features for "schema at the boundary," until
+you impose a discipline above the language.
+
+A promise will evaluate in a surprising environment if you capture it and
+force it later. A class attribute will be ignored by any function that is
+not generic. The search path will resolve a name to whatever was attached
+last. Coercion will add a factor level you did not mean, or drop one.
+`NA` will flow through a logical test and return `NA`, and `if (NA)` will
+complain, and somewhere in that pair of behaviors a bug will hide for a
+year. None of this is a reason to refuse the REPL. It is a reason to
+treat the REPL as the place you discover the concept, and the package as
+the place you stop the concept from leaking.
+
+The sequence that matches the ladder, said as advice:
+
+1. Explore with the dynamic machine. Dirty data, wrong types, one-off
+   plots, `inspect` when a result is absurd.
+2. Notice the nouns that kept coming back, and the verbs you repeated.
+3. Parse those nouns at the boundary. Constructors that refuse junk.
+   `format` methods that make the meaning obvious.
+4. Package the verbs. Generics where a stranger should be able to add a
+   method. A handle only where identity is the feature.
+
+Step 2 is the part people skip, and then step 3 becomes ceremony around
+the wrong nouns. The low-level session this book came from was step 1
+aimed at the language itself. That is allowed. Most days step 1 is aimed
+at a file full of addresses.
+
+## Why Python and JavaScript feel more direct
+
+They default to named objects with methods. The habit "there is a class
+for this" is ambient, so the path from a domain noun to a bundle of
+behavior is short. You still do not get real contracts until you add
+something like Pydantic or Zod. The object was never the contract. It was
+a place to put methods. The contract arrives when construction parses.
+
+R's ambient habit is "there is a function for this," and a class is
+optional metadata on a vector. The path from a domain noun to a defended
+value is longer, because you are building the noun out of a vector, a
+class attribute, and a constructor the language considers optional. The
+reward, when someone actually does it, is an API that composes. A request
+is a value. A plot specification is a value. A data frame is a relation.
+Verbs take these and return these. The user interface is the vocabulary.
+
+This is a personal preference and also a technical one. Dislike of
+message-passing as a default is compatible with respecting what that
+default buys: one obvious place to look for behavior. R asks you to look
+in the verbs, which is wonderful when the verbs are curated and miserable
+when every package invents a private dialect. Curation is the price of
+the preference. @sec-verbs is about paying it on purpose.
+
+## Where R wins on the merits
+
+A few comparisons, kept specific so they do not turn into team sports.
+
+**httr2.** A request is a value you build with a pipe of functions:
+URL, headers, body, authentication, then perform. The
+[introductory vignette](https://httr2.r-lib.org/articles/httr2.html)
+shows the shape. Errors are classed. The perform step is the edge where
+the value meets the network. This is the functional core and the
+imperative shell in one pipeline, and it is pleasant in a way
+object-graphs of HTTP clients often are not. You can see the request. You
+can print it before you send it. Printing is part of the design.
+
+**ellmer.** A conversation with a model is a session you hold, and the
+operations on it are a small vocabulary: send a turn, register a tool,
+extract a typed value. The
+[package site](https://ellmer.tidyverse.org/) is the reference. A
+conversation has identity --- turns accumulate --- so a handle is the
+honest representation. The design win over a large agent framework is the
+size of the vocabulary and the refusal to hide the request. Compare that
+with LangChain-style graphs when you want a lesson in what "more objects"
+does to a domain that wanted a few verbs. The lesson is not that Python
+cannot be clear. It is that a framework can spend its complexity budget
+on the wrong axis.
+
+**ggplot2.** Wilkinson's *Grammar of Graphics* gave the field a
+vocabulary. Wickham's
+[layered grammar](https://doi.org/10.1198/jcgs.2009.07098) turned it into
+an embedded language of data, aesthetic mappings, geoms, stats, and
+facets. You can dislike using it and still recognize the move. A plot is
+a specification, a value, built by composing layers. It is not a scene
+graph you mutate. Formulas in modeling packages are the older version of
+the same move. R's frameworks, when they work, look like grammars.
+
+**Tidy data and verbs.** Once a data frame is a relation with a
+convention for rows and columns, a whole ecology of verbs can share it.
+The win is the shared noun, not any single package. A new verb can be
+written without inheriting from a table class. That is open dispatch as
+an industry structure, and it is the subject of the next chapter.
+
+## The nag
+
+Python nags you early, with objects. You still need a schema library
+before the nag means "invalid states are unrepresentable." R nags you
+late, with `stopifnot` scattered through helpers and with users who
+received a list and had to guess. Unless the package treats the contract
+as the product.
+
+The REPL is not a betrayal of that product. It is how you find out which
+contracts are worth writing. The difficult part is that the language will
+never force the transition. You can stay in the conversation forever.
+Production R is the decision to leave the conversation in the places where
+the concept has stabilized, and to keep the conversation available
+everywhere it has not.

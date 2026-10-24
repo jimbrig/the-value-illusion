@@ -1,0 +1,203 @@
+# The Header {#sec-header}
+
+`inspect` is not a closure you can open in the editor. It is a C entry,
+`do_inspect`, living in `src/main/inspect.c` and reached through
+`.Internal`. The thing being printed is a node on the heap. The line you
+get back is the node's header, translated into a dialect that rewards a
+little memorization.
+
+A typical line from a length-one integer inside a classed list:
+
+```text
+19 VECSXP g0c1 [OBJ,MARK,REF(15),ATT] (len=1, tl=0)
+```
+
+Read it left to right.
+
+| Piece | What it is |
+| --- | --- |
+| address | Where this node sits. Identity, for this process, right now. |
+| `19` | The `SEXPTYPE` number. 19 is `VECSXP`. |
+| `VECSXP` | The type name. |
+| `g0c1` | Generation bit, then allocation class. |
+| `[...]` | Header flags that happened to be set. |
+| `(len=, tl=)` | Vector length and the allocator's true length, when the node is a vector. |
+
+The manual's version of this layout is
+[R Internals, section 1.1](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#SEXPs).
+The header changed shape in R 3.5.0. Older blog posts that describe a
+32-bit `sxpinfo` are describing a previous machine.
+
+## The type tag is five bits
+
+`SEXPTYPE` occupies the first five bits, so there is room for 32 tags.
+[The table in the manual](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#SEXPTYPEs)
+is the one to trust. The ones a session like this actually meets:
+
+| Code | Name | At R level |
+| --- | --- | --- |
+| 0 | `NILSXP` | `NULL`, and only `NULL` |
+| 1 | `SYMSXP` | names |
+| 2 | `LISTSXP` | pairlists: attributes, formals |
+| 3 | `CLOSXP` | ordinary functions |
+| 4 | `ENVSXP` | environments |
+| 5 | `PROMSXP` | promises |
+| 6 | `LANGSXP` | calls |
+| 7 | `SPECIALSXP` | specials: `[`, `{`, `if`, `function` |
+| 8 | `BUILTINSXP` | builtins: `sum`, `+`, `c` |
+| 9 | `CHARSXP` | a single cached string, inside a character vector |
+| 10 | `LGLSXP` | logical |
+| 13 | `INTSXP` | integer |
+| 14 | `REALSXP` | double |
+| 15 | `CPLXSXP` | complex |
+| 16 | `STRSXP` | character |
+| 17 | `DOTSXP` | `...` |
+| 19 | `VECSXP` | list |
+| 21 | `BCODESXP` | byte code |
+| 22 | `EXTPTRSXP` | external pointer |
+| 23 | `WEAKREFSXP` | weak reference |
+| 24 | `RAWSXP` | raw |
+| 25 | `OBJSXP` | S4, and S7 instances |
+
+Codes 11 and 12 are a genuine piece of archaeology, not a rumor. The manual
+says they were used for internal factors and ordered factors, and were
+withdrawn. The numbers survive in serialized objects, so the gap cannot be
+casually reused. Factors today are integers with attributes. That story is
+in @sec-in-context. `OBJSXP` used to be spelled `S4SXP`; the comment is
+still sitting in `sexptype2char`.
+
+There is also a pseudo-type `FUNSXP` with code 99, used in a few internal
+tables to mean "some kind of function." You will not see it in an inspect
+line. `ANYSXP` (18) is a placeholder for "any argument," and there are no
+objects of that type.
+
+## `g0c1` is two different fields
+
+The generation and the class are neighbors in the printout and unrelated
+in the header.
+
+`gcgen` is one bit. Inspect prints it as `g0` or `g1`. It will never print
+`g2`. The collector itself is richer than the bit: `memory.c` keeps a
+nursery plus old generations (`NUM_OLD_GENERATIONS` is 2, and the comment
+next to it says the header bit is why you cannot have more than that).
+What you can actually see is the bit. In a live session, freshly allocated
+nodes tend to show `g0`. The nodes that have been around since startup ---
+`R_NilValue`, locked symbols, cached `CHARSXP`s --- show `g1`. Treat `g1`
+as "this has survived, or was born old." Treat a blog post that decodes
+`g0c1` as "generation 0 of 3, size class 1 of a vague scale" as out of
+date.
+
+`gccls` is three bits, so eight allocation classes. The manual's
+[allocation-class section](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Allocation-classes)
+and the comment in `memory.c` agree:
+
+| Class | What lives there |
+| --- | --- |
+| 0 | Non-vector nodes, and the zero-size bucket |
+| 1--5 | Small vectors, with room for 8, 16, 32, 64, and 128 bytes |
+| 6 | Custom allocators (`allocVector3`), not counted as ordinary R memory |
+| 7 | Large vectors, `malloc`'d individually |
+
+That is the whole of "random access versus cons" as a memory-manager
+question, and it is not stack versus heap. A pairlist node is class 0
+because it is not a vector. A length-one integer is class 1 because four
+payload bytes fit in the 8-byte bucket. A length-one character vector is
+also class 1: one pointer. An environment's hash table of a few dozen
+slots is class 7: twenty-nine pointers do not fit in 128 bytes. Empty
+`character()` and empty `integer()` landed in class 0 in the dumps,
+because a zero-length vector has nothing to put in a data page.
+
+Small vectors come out of pages of about 2000 bytes. Large ones are their
+own allocations. Custom-allocator vectors can share memory in ways R's
+accounting refuses to pretend to understand. ALTREP, later, is a further
+escape hatch: the node can exist before the data does.
+
+## The flags are the header talking
+
+The bracket is a selection, not a full register dump. The fields live in
+the 64-bit `sxpinfo` structure quoted in the manual:
+
+```c
+SEXPTYPE type      :  5;
+unsigned int scalar:  1;
+unsigned int obj   :  1;  /* class attribute? */
+unsigned int alt   :  1;  /* ALTREP? */
+unsigned int gp    : 16;
+unsigned int mark  :  1;
+unsigned int debug :  1;
+unsigned int trace :  1;
+unsigned int spare :  1;
+unsigned int gcgen :  1;
+unsigned int gccls :  3;
+unsigned int named : 16;  /* the reference count, these days */
+```
+
+The flags worth knowing by sight:
+
+| Flag | Meaning |
+| --- | --- |
+| `OBJ` | The `obj` bit. This is what `is.object()` answers. A class attribute sets it. |
+| `ATT` | The attribute pointer is not Nil. Attributes are a pairlist. |
+| `MARK` | The collector has marked the node in this collection. |
+| `REF(n)` | The reference count. |
+| `LCK` | Locked. Common on symbols and on locked bindings or environments. |
+| `gp=0x…` | Sixteen general-purpose bits. Their meaning depends on the type. |
+| `ALT` | Not always spelled that way in the bracket, but the `alt` bit is how ALTREP is recognized. |
+| `GL` | Shows up on the global environment in inspect output. |
+
+`gp` is where people get inventive, and it is worth resisting. On a
+`CHARSXP` the inspect line often already translates the bits you care
+about: `[ASCII] [cached]`, sometimes with `ATT` because the character
+cache hangs information off the attribute pointer. The manual has a
+section on
+[CHARSXP encodings](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Encodings-for-CHARSXPs)
+and another on the
+[cache](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#The-CHARSXPs-cache).
+Symbol `gp` values (`0x4000`, `0x6000`, `0x7000`, `0x8000` in the dumps)
+are a different code book. They are decoded in the source, not in a stable
+user manual, and this book leaves them on the
+[open list](open-questions.qmd) rather than inventing a table.
+
+## `REF(65535)` is a saturated count
+
+`NAMED_BITS` is 16. Under the reference-counting build,
+`REFCNTMAX` is `(1 << 16) - 1`, which is 65535. `MARK_NOT_MUTABLE` sets
+the count to that ceiling. Incrementing past the ceiling is a no-op, and
+decrementing a saturated count is also a no-op: the macros in `Defn.h`
+refuse to move a count that has hit the cap. A saturated node stays
+saturated. That is the technical meaning of **immortal** in these notes.
+The collector is not invited to free it, and the copy-on-modify logic is
+not invited to mutate it.
+
+`R_NilValue` is constructed that way on purpose. So are a lot of other
+process-lifetime nodes: many symbols, `R_TrueValue`, `R_FalseValue`, the
+canonical logical `NA`. A high count on a value you just created is a
+different phenomenon. It means something in the process is holding the
+node. The evaluator, the protection stack, `.Last.value`, a promise, an
+attribute, an environment binding, and an IDE's object browser all count.
+The same binding can print `REF(1)` in a quiet console and a much larger
+number under RStudio, because RStudio is a holder. The count is a census
+of current pointers. It is not a property of the source literal.
+
+A fresh empty vector in those dumps printed an empty bracket, `[]`. A node
+with a positive count printed `REF(n)`. Read a missing `REF` as "no
+tracked holders worth printing," and then go look at `inspect.c` before
+you build a theory on the absence. The field still exists.
+
+## Where `inspect` sits
+
+The symbol `inspect` in the internal table is a `SYMSXP` whose internal
+pointer aims at that C routine. You do not hold the printer as a value in
+the way you hold the vector you asked it to describe. `.Internal` and
+`.Primitive` are the subject of
+[chapter 2 of the same manual](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Internal-vs-_002ePrimitive).
+Primitives are the fast path. Internals are the slightly more ordinary
+one. Neither is "an R function that happens to be written in C" in the way
+a `.Call` wrapper is. They are entries in the interpreter's own table.
+
+One more ambiguity the manual states cleanly, because the dumps make it
+easy to miss: an environment is both a frame and an enclosure. The frame
+is the bindings. The enclosure is the parent you walk when a name is
+missing. Hash tables, when present, are a `VECSXP` of pairlists, and the
+empty buckets are the Nil singleton, over and over, at one address. That
+picture is the whole of the next two chapters.

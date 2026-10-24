@@ -1,0 +1,166 @@
+# Signals {#sec-signals}
+
+The comment in the notebook is the right complaint, and it is more precise
+than it felt at the time.
+
+R's conditions are S3 objects sitting on a signaling mechanism that can
+run a handler while the stack is still alive, muffle a warning, or invoke
+a restart. The culture around them is an exception culture: `stop`,
+`tryCatch`, unwind, maybe wrap the message in a new class and stop again.
+Both facilities are real. One of them is taught. The other is how robust
+software actually wants to talk.
+
+## Three moves, not one
+
+Kent Pitman's
+[retrospective on condition handling](https://nhplace.com/kent/Papers/Condition-Handling-2001.html)
+separates what most languages glue together. The Common Lisp HyperSpec
+states the mechanism in
+[chapter 9](http://www.lispworks.com/documentation/HyperSpec/Body/09_.htm).
+Compressed:
+
+1. **Signal.** Name a situation by allocating an object, not by throwing a
+   string.
+2. **Handle.** Decide policy while the stack that signaled is still there.
+   A handler can repair, muffle, log, or decline.
+3. **Restart.** Offer a named way to resume. `invokeRestart` transfers
+   control to a restart the signaler, or someone above the signaler,
+   established for this purpose.
+
+`tryCatch` does a narrower thing. It establishes an exiting handler. The
+stack unwinds to the catch, and then your function runs. Whatever the
+callee might have done to fix the problem and continue is gone. That is
+the right tool when the policy really is "abandon this attempt." It is
+the wrong default when the policy is "hear about this and decide."
+
+`withCallingHandlers` establishes a calling handler. It runs on the live
+stack. `withRestarts` and `invokeRestart` are the resume mechanism, and
+they are base R, not a package invention. `signalCondition` is the
+low-level signal. Warnings and messages are conditions that happen to
+have default handlers installed by the runtime: print something, and in
+the warning case continue. `tryCatch` on a warning is you replacing that
+policy with an unwind. Sometimes you want that. Often you wanted to
+muffle, collect, or re-signal.
+
+[Advanced R's conditions chapter](https://adv-r.hadley.nz/conditions.html)
+is the practical map, including the class hierarchy (`condition` →
+`error` / `warning` / `message`, and your subclasses under those).
+[rlang::try_fetch()](https://rlang.r-lib.org/reference/try_fetch.html)
+is the current "handler that can return a value" spelling, and the `cnd_`
+constructors are how you build the objects without hand-rolled `structure()`
+calls. None of this is obscure because it is weak. It is obscure because
+the first page of search results says `tryCatch`.
+
+## Catching a 500 to throw a 500
+
+The failure mode is a layering mistake.
+
+An HTTP library that sees status 500 has learned a fact. The fact wants a
+class: the status, the URL, the body, the request id. That class is the
+signal, or it is the value you return if you have chosen errors-as-values
+for this boundary. What the application does about it is a different
+function, living in a different place.
+
+| Layer | Job |
+| --- | --- |
+| Library boundary | Signal a classed condition, or return a result value, with enough structure to branch on |
+| Policy boundary | `withCallingHandlers` or `try_fetch` map that class onto a recovery, a richer condition, or a logged warning |
+| Application boundary | Abort, retry, prompt, or degrade, by invoking a restart or by returning |
+
+Catching an httr2 error solely to `stop()` with a new message throws away
+the class the library already gave you and forces every caller to parse
+text. Re-signaling a *richer* condition, with the original as the parent,
+is a different act: you are translating a transport fact into a domain
+fact. The class is the point of the translation. The string is for the
+human at the host.
+
+Parent classes matter here. A handler for `http_error` can sit above a
+handler for `http_error_500`. A handler for `error` is the wide net.
+S3 dispatch on the condition's class is the "native method dispatch" the
+comment was reaching for. It works. It works only if someone signals a
+class worth dispatching on, and only if the handler is registered where
+the stack still has the context to use it.
+
+## Errors as values are a neighboring door
+
+Rust's `Result`, `purrr`'s `safely`, and a validator that returns a
+failure value instead of signaling are a different design with the same
+taste. The failure is data. The caller branches on it with ordinary
+control flow. There is no stack discipline to get right, and there is
+also no way for a caller three frames up to establish a restart the
+callee can invoke. You chose an explicit return channel over a signal
+channel.
+
+R can do both, which means a package has to pick. One effect story per
+boundary. Fatal `stop` for programmer errors and invariant failures.
+Classed signals for situations a caller might plausibly handle. Result
+values when the failure is an ordinary outcome of the domain ("this
+address did not geocode") and you do not want it traveling by a side
+channel. Mixing all three in one function, plus a `cat()` of the URL for
+good measure, is how an API feels schizophrenic.
+
+S7 validators that return character vectors of problems are already in the
+errors-as-values family. They are not a condition system. They are a
+parse step. Use them at construction. Use conditions for what happens
+later, when a well-built value meets a world that can still say no.
+
+## Streams, and the C leak
+
+PowerShell's output streams are the cleanest picture of what a condition
+system is *for*, even though the substrate is different. The official list
+is in
+[about_Output_Streams](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_output_streams):
+
+| Stream | PowerShell | R, if you are disciplined |
+| --- | --- | --- |
+| 1 Success | pipeline objects | the return value |
+| 2 Error | `Write-Error` | an `error` condition |
+| 3 Warning | `Write-Warning` | a `warning` |
+| 4 Verbose | `Write-Verbose` | a message or a classed condition behind a verbose flag |
+| 5 Debug | `Write-Debug` | a debug condition, or cli behind a flag |
+| 6 Information | `Write-Information` | a classed message, cli alerts |
+| Progress | `Write-Progress`, not redirectable | `cli` progress, or a progress condition |
+
+The win is orthogonal channels. A function can return a value *and* warn
+*and* describe what it is doing, and the caller decides what to keep.
+PowerShell's redirection (`3>&1`, and the rules in
+[about_Redirection](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection))
+makes that a shell feature. R makes it a handler feature. The idea is the
+same: side-channel meaning is structured, and the host picks it up at the
+edge.
+
+Two R-specific cuts.
+
+Warnings and messages are already conditions, so they can be muffled,
+collected, promoted to errors (`options(warn = 2)` is the blunt version),
+or given a class and a handler. `cli` output that goes through the
+condition-aware UI is in this world. A hand-rolled `cat()` is not. Text
+on the console cannot be dispatched. It can only be captured, and capture
+is a miserable API.
+
+C `stdout` and `stderr` are a second console that R's condition system
+does not own. A `.Call` that `printf`s has stepped outside the protocol.
+Robust packages treat that as a bug unless the foreign chatter is caught
+and re-signaled as a condition, or explicitly documented as a debug leak.
+The interface principle cuts both ways. You may call C. C does not get to
+talk to your user behind the language's back.
+
+## A package doctrine
+
+Small enough to stick on the wall:
+
+- Return values for success. Type them.
+- Signal classed conditions for everything a caller might route.
+- Prefer calling handlers and `try_fetch` at library boundaries; use
+  `tryCatch` when you truly mean "this attempt is over."
+- Establish restarts where a caller could plausibly resume: skip this
+  record, use this default, retry with this credential.
+- Put narration and progress in cli or in messages, behind a preference.
+- Do not `cat()` a situation you could signal.
+- If C talks, wrap the talk.
+
+This is the functional-core idea applied to communication. The core
+returns a value or signals an object. The shell --- the handler, the
+option, the CLI flag, the IDE --- decides what the human sees. The next
+chapters are about why R grew a core that will not enforce any of this,
+and why that is survivable.

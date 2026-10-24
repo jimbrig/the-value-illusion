@@ -1,0 +1,84 @@
+# Glossary {#sec-glossary}
+
+Terms for the distinctions this book keeps needing. Each one points at the
+chapter that gives it a home. Popups in the text use the same definitions.
+
+ALTREP
+
+: A framework for giving an ordinary SEXPTYPE a different payload: a
+  compact sequence, a deferred string, a mapped vector, a cached answer
+  to "are you sorted?" See [the value illusion](04-value-illusion.qmd).
+
+Condition
+
+: A classed signal. Handlers can run while the stack is still live, or
+  they can unwind. See [signals](06-signals.qmd).
+
+Cons cell
+
+: A heap node with a head (CAR), a tail (CDR), and an optional name (TAG).
+  Pairlists and calls are chains of them, ending at Nil. See
+  [cons and vectors](03-cons.qmd).
+
+Copy-on-modify
+
+: The rule that a shared ordinary vector is duplicated before a write, so
+  other names keep the old value. See
+  [the value illusion](04-value-illusion.qmd).
+
+Functional core
+
+: The part of a program that decides on values. The imperative shell
+  around it is where effects, handles, and hosts live. See
+  [where state lives](10-containers.qmd).
+
+Generic vector
+
+: R's user-facing list. One header plus a contiguous array of SEXP
+  pointers. Type `VECSXP`. See [three empties](02-empties.qmd) and
+  [cons and vectors](03-cons.qmd).
+
+Immortal
+
+: A node the collector must not free and the mutator must not modify. The
+  reference count is pinned at `REFCNTMAX`, 65535. Nil is the canonical
+  case. See [the header](01-header.qmd).
+
+Open verb
+
+: An operation that lives outside the type, so new nouns can join it and
+  new verbs can be taught to old nouns. See [open verbs](09-open-verbs.qmd).
+
+Promise
+
+: A delayed argument: an expression, an environment, and eventually a
+  value. Forced at most once. See
+  [the value illusion](04-value-illusion.qmd).
+
+Reference owner
+
+: An object whose identity is part of the API. Aliases observe the same
+  evolving state. See [where state lives](10-containers.qmd).
+
+Restart
+
+: A named way to resume from a condition at the point where it was
+  signaled, if someone established one. See [signals](06-signals.qmd).
+
+Ubiquitous language
+
+: The curated names of a domain, shared by the code, the console, and the
+  people working in it. See [the law](00-the-law.qmd) and
+  [data drives the design](13-data-drives.qmd).
+
+Value illusion
+
+: The public story that ordinary R objects behave as values, sustained by
+  sharing, reference counts, delayed copies, and sometimes by never
+  allocating the payload at all. See
+  [the value illusion](04-value-illusion.qmd).
+
+View
+
+: How a value is shown. A separate contract from what the value is. See
+  [shown on purpose](12-appearance.qmd).

@@ -1,0 +1,82 @@
+project:
+  type: book
+
+lang: en
+bibliography: references.bib
+glossary:
+  path: glossary.yml
+  popup: click
+
+book:
+  title: "The Value Illusion"
+  subtitle: "Field notes on R's runtime, and the design taste that follows"
+  description: "What R's SEXP machine is actually doing, where that design came from, and the package-design stance that falls out of it: name things, admit only valid values, show them well, and extend them with verbs."
+  author: "Jimmy Briggs"
+  date: last-modified
+  favicon: assets/favicon.svg
+  open-graph: true
+  twitter-card: true
+  search: true
+  repo-url: https://github.com/jimbrig/the-value-illusion
+  repo-actions: [edit, issue]
+  site-url: https://docs.jimbrig.com/the-value-illusion/
+  chapters:
+    - href: index.qmd
+      text: Preface
+    - href: 00-the-law.qmd
+      text: The Law
+    - part: "The Metal"
+      chapters:
+        - href: 01-header.qmd
+          text: The Header
+        - href: 02-empties.qmd
+          text: Three Empties
+        - href: 03-cons.qmd
+          text: Cons and Vectors
+        - href: 04-value-illusion.qmd
+          text: The Value Illusion
+        - href: 05-in-context.qmd
+          text: In Context
+        - href: 06-signals.qmd
+          text: Signals
+    - part: "The Hybrid"
+      chapters:
+        - href: 07-lineage.qmd
+          text: Lineage
+        - href: 08-repl.qmd
+          text: The REPL, Then the Contract
+    - part: "The Taste"
+      chapters:
+        - href: 09-open-verbs.qmd
+          text: Open Verbs
+        - href: 10-containers.qmd
+          text: Where State Lives
+        - href: 11-types.qmd
+          text: Types Without a Checker
+        - href: 12-appearance.qmd
+          text: Shown on Purpose
+        - href: 13-data-drives.qmd
+          text: Data Drives the Design
+  appendices:
+    - href: lab.qmd
+      text: Lab Notebook
+    - href: open-questions.qmd
+      text: Open Questions
+    - href: glossary.qmd
+      text: Glossary
+    - href: sources.qmd
+      text: Sources
+
+format:
+  html:
+    theme:
+      light: [cosmo, styles/custom.scss]
+      dark: [darkly, styles/custom.scss]
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-copy: true
+    code-overflow: wrap
+    canonical-url: true
+    link-citations: true
+    citations-hover: true

@@ -1,0 +1,106 @@
+# Preface {.unnumbered}
+
+These are field notes from poking R until the abstractions confessed, and then
+asking what that confession is for.
+
+The session that started them had no plan. It called `.Internal(inspect())`
+on `NULL`, on `list()`, on a hand-built S3 object, on an environment, on
+`bit64::integer64()`, on an S7 class, on an R6 generator, on a weak
+reference. It pasted the dumps back into the file and argued with them in
+the comments. The argument turned out to be an old one, wearing new syntax:
+value against identity, signal against unwind, representation against type,
+and the question of where a name is allowed to mean only one kind of thing.
+
+::: {.epigraph}
+R is a Lisp-family language that sells a Fortran-ish value illusion. Almost
+everything behaves like an immutable value, with the copy postponed until a
+write has to happen. A few objects refuse the illusion, and those are the
+ones whose identity is part of the API.
+:::
+
+That sentence organizes the metal. The sentence that organizes the work you
+do *with* the metal is shorter, and it showed up later in the same
+conversation, once the dumps had stopped being the point:
+
+> Name it. Admit only valid values under that name. Show it well. Extend it
+> with verbs.
+
+Object-oriented or functional is a choice of machinery under that law. The
+data you have to represent drives the names. Functions compose the workflows
+the data flows through. Everything else in this book is a consequence, a
+source, or a place the consequence gets sharp.
+
+## What kind of claim this is
+
+Four registers, and they are not interchangeable.
+
+A **mechanism** is something a manual or the R sources state. The claim that
+there is exactly one `NILSXP`, `R_NilValue`, is a mechanism. It lives in
+[R Internals](https://cran.r-project.org/doc/manuals/r-release/R-ints.html)
+for R 4.6.1, and the initialization in
+[`memory.c`](https://github.com/wch/r-source/blob/trunk/src/main/memory.c)
+is blunt about it: that node has to be the first cons cell allocated, or
+armageddon happens.
+
+A **probe** is something a session actually printed. `identical(NULL, c())`
+is `TRUE`. `identical(NULL, list())` is `FALSE`. An S7 instance changed
+address across `@p <-`. Those are facts about a session, and the small
+[verification script](https://github.com/jimbrig/the-value-illusion/blob/main/verification/check-claims.R)
+re-checks the ones that do not depend on a particular IDE.
+
+A **reading** is an interpretation that the mechanism and the probe support.
+"Empty `list()` is a zero of the generic-vector type, and that fact is older
+and deeper than S3 dispatch" is a reading. It can be argued with.
+
+A **recommendation** is a way to build. "A client is a handle; a config is a
+value" is a recommendation. It is earned by the reading, and it can be
+overruled for a stated reason.
+
+The chapters mix the four on purpose. When a sentence is doing one of them,
+it should be possible to tell. The [inquiry ledger](open-questions.qmd) is
+where a reading is still soft.
+
+## What this is next to
+
+The design manual for the type-driven half of this taste already exists, and
+this book does not pretend to replace it:
+[S7 Design Notes](https://docs.jimbrig.com/s7-design-notes/). That book asks
+what knowledge a model can carry so the rest of the program stops
+rediscovering it. This one asks what the runtime is already carrying, and
+which design habits are a truce with that runtime rather than a fight with
+it.
+
+[Advanced R](https://adv-r.hadley.nz/) remains the best long-form map of
+names and values, environments, object systems, and conditions. [R
+Internals](https://cran.r-project.org/doc/manuals/r-release/R-ints.html) is
+the document these notes keep going back to, with the warning printed in the
+manual itself: it is a work in progress and should be checked against the
+source. Where the two disagree with a dump, the dump wins for that session
+and the source wins for the mechanism.
+
+## How to read
+
+Read [The Law](00-the-law.qmd) if you read one chapter. It is the whole
+argument in miniature.
+
+The metal chapters are a guided decoding of `inspect` output: the header,
+the three different empties, cons cells against generic vectors, the
+machinery under copy-on-modify, the SEXP types you only meet in the right
+context, and the condition system people keep using as if it were Java.
+
+The hybrid chapters are historical, with the romance scraped off. R was
+built for a conversation with data. That is why the REPL is so good, and why
+a production package has to impose contracts the language will not impose
+for you.
+
+The taste chapters are the part that should change how a package is shaped:
+open verbs, where state is allowed to live, runtime types as a substitute
+for a missing schema layer, presentation as part of the contract, and the
+data-driven close.
+
+The [lab notebook](lab.qmd) walks the original probes in order, including the
+hypothesis that did not survive the next call. That failure is the best
+thing in the file.
+
+Private chat is not evidence here. The probes, the manuals, and the papers
+are. Where a conclusion is the author's taste, it is labeled as taste.

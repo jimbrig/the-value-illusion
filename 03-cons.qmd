@@ -1,0 +1,107 @@
+# Cons and Vectors {#sec-cons}
+
+"Random access" sounds like a hardware claim. In this language it is an
+indexing claim. Both structures live on the heap, in the collector's node
+pools. The C stack and the protection stack are real, and they are not
+where your list is stored.
+
+## A cons cell is three pointers
+
+Lisp's *cons* is short for *construct*. A {{< glossary "cons cell" >}} is
+one node:
+
+| Field | Role in R |
+| --- | --- |
+| CAR | the head, the value |
+| CDR | the rest of the chain |
+| TAG | an optional name, a `SYMSXP`, or Nil |
+
+A pairlist of length three is three heap nodes linked by `CDR`, and the
+last CDR is `R_NilValue`. Reaching element *i* walks *i* links. That cost
+is linear. Attributes are stored this way. Formals are stored this way.
+The manual is explicit that a `LANGSXP`, the type of a call, is a pairlist
+whose CAR is the function and whose CDR is the arguments, tags included
+when the caller named them.
+
+You can see it in any classed object's attribute dump. `names` and `class`
+are tags on a `LISTSXP`. The values hanging off those tags are ordinary
+vectors, often a `STRSXP` of length one whose single `CHARSXP` is in the
+string cache and has a ridiculous reference count because the cache is
+doing its job. The structure around them is still a linked list. R did not
+modernize that path. It stopped asking analysts to live on it.
+
+## A generic vector is an array of pointers
+
+A `VECSXP` is one header plus a contiguous block of `SEXP` pointers.
+Element *i* is `data[i]`. That is constant time. That is all
+"random access" means here. It does not mean the pairlist is on the stack,
+and it does not mean the vector is a C array of unboxed values. The
+pointers in a list refer to other nodes, which have their own headers,
+their own counts, their own possibility of being shared.
+
+Atomic vectors are the unboxed case: an `INTSXP` really is a block of C
+`int`s, a `REALSXP` a block of `double`s. A list is a block of pointers
+*to* values. Sharing a list and sharing an element of the list are
+different facts. That difference is why changing one column of a data
+frame does not have to copy the other columns. The vector of column
+pointers is the thing that gets duplicated. The untouched columns keep
+their addresses. [Advanced R's chapter on names and
+values](https://adv-r.hadley.nz/names-values.html) is the patient version
+of this, with pictures.
+
+## Demoted, not deleted
+
+Early R was closer to Scheme. Implementing a GNU S pushed the pairlist
+inward and the vector outward. Chambers' history in the R Journal article
+is the long version of that turn: an interface to Fortran arrays, a
+user language of expressions that return objects, and an implementation
+that grew a second, vector-shaped world on top of a cons-shaped evaluator.
+
+What remains of the cons world at the surface:
+
+- `pairlist()` and `as.pairlist()`, which most code never needs
+- the occasional pairlist that leaks out of a primitive and gets coerced
+  to a list on the way past
+- `formals()`, which returns a pairlist because that is what a closure's
+  formals *are*
+- attributes, which you manipulate with `attr` and `attributes` so you
+  never have to walk the chain yourself
+- every call you `quote`, which is a `LANGSXP` and therefore a cons chain
+  you are encouraged to treat as data
+
+"R did not abandon cons; it demoted them to implementation substrate" is
+this split, said in one line. Analysts get vectors and generic vectors.
+The evaluator keeps cons cells for the sentences of the language and for
+the metadata hung on values. When a pairlist crosses into user code it is
+often promoted, because the user-facing sequence type won.
+
+The terminology is scar tissue. In Lisp a list *is* a chain of conses. In
+R a list is a `VECSXP`, and the chain of conses is called a pairlist so
+that the two can coexist in one manual. If that naming bothers you, it
+should. It is the sound of two languages that refused to give up their
+word for the same idea.
+
+## What you can see without a microscope
+
+```r
+typeof(quote(f(x = 1)))   # "language"  -> LANGSXP
+typeof(formals(mean))     # often "pairlist"
+typeof(list(a = 1))       # "list"      -> VECSXP
+typeof(attributes(factor(1)))  # "pairlist" or NULL, and the class attribute is real
+```
+
+`lobstr::ast()` prints a call as a tree because the call *is* a tree of
+cons cells. `lobstr::ref()` on a list shows you the pointer array and then
+the children. The two pictures are the two worlds. Once you can see which
+world a given object is in, a surprising number of performance folktales
+become ordinary data-structure facts: walking a pairlist in a tight loop
+is a linked-list walk, growing a vector without the true-length trick is
+copying an array, and `[[` on a list is an index, not a search.
+
+The protection stack is the other "stack" worth a sentence, so it stops
+haunting the word. R's C API requires callers to protect nodes they want
+to survive a garbage collection. That protection is a pointer stack in the
+runtime, described around the memory-allocator sections of the internals
+manual. It is bookkeeping for the collector. It is not the place pairlists
+live, and it is not an invitation to reason about user objects as
+stack-allocated values. User-visible SEXPs are heap nodes. Full stop.

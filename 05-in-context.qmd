@@ -1,0 +1,172 @@
+# In Context {#sec-in-context}
+
+A lot of SEXP types feel mythical until the right expression manufactures
+one. Absence from a typical script is not absence from the type system.
+The notebook kept bumping into this, and it is worth walking type by type
+with the context that makes each one show up.
+
+## Builtins and specials
+
+`typeof(sum)` is `"builtin"`. `typeof(`[`)` is `"special"`.
+`typeof(`{`)` is `"special"`. `typeof(function() NULL)` is `"closure"`.
+The nodes are `BUILTINSXP`, `SPECIALSXP`, and `CLOSXP`. They are easy to
+miss because printing them shows `.Primitive("sum")` or the source of the
+closure, and because you rarely `inspect` the function rather than the
+value it returned.
+
+The semantic difference is the old Lisp split between an applicative
+function and a form that receives code. A builtin evaluates its arguments,
+then receives the values. A special does not. `[`, `if`, `{`, `&&`, `||`,
+`function`, `quote`, and `<-` have to be specials, because evaluating
+everything first would destroy the construct. `` `&&` `` must not touch
+the right-hand side when the left-hand side is false. `function` must not
+evaluate the body at definition time. The internals manual calls these
+out as
+[special primitives](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Special-primitives).
+
+Closures are the third kind: formals (a pairlist), body (usually a
+`LANGSXP`), and enclosing environment. That triple is what `inspect`
+prints under `FORMALS`, `BODY`, and `CLOENV`. An S7 class is one of these.
+The notebook's `new_class()` dump is a `CLOSXP` with a class attribute of
+`c("S7_class", "S7_object")` and a pile of metadata --- name, parent,
+properties, validator, constructor --- hanging off the attribute pairlist.
+The constructor you call is a function. The class object *is* that
+function, plus attributes. That is a very R solution: reuse the closure
+node you already have, and hang the dictionary off the side.
+
+## Objects, factors, and the `integer64` lie
+
+Two different words got called "object," and the confusion is reasonable.
+
+`is.object(x)` answers the `OBJ` bit, which the header comment defines as
+"does this have a class attribute?" A factor is an `INTSXP` with a
+`levels` attribute and `class = "factor"`. The bit is set. `typeof` stays
+`"integer"`. `OBJSXP` is a different question: type code 25, the node
+shape used for S4 objects and for S7 instances, which do not consist
+solely of a simple vector or function. The manual says so directly. The
+notebook's S7 instance, after `@p <- "aaa"`, is type 25. The factor never
+was.
+
+Factors feel "more low-level" because base R and the C API know them
+intimately: modeling code, tabulation, printing, `levels<-` as a
+primitive generic. The representation pattern is still the S3 pattern.
+Historically they had their own SEXP types, codes 11 and 12, and those
+were withdrawn. The withdrawal is the tell. R decided that "integer plus
+attributes" was enough type system for factors, and then lived with the
+consequences.
+
+`bit64::integer64()` is the same pattern with the costume showing.
+`typeof` is `"double"`. Inspect shows a `REALSXP` with `OBJ` and `ATT`,
+and a class string `"integer64"`. A double is 64 bits wide, so the
+package stores a 64-bit integer in the payload a double would have used
+and lies, politely, at the class layer. S3 as a reinterpretation of
+storage is half of R's power. You can ship a new semantic type without a
+new SEXPTYPE, which is why the set of SEXPTYPEs can stay frozen. It is
+also half of R's pain. Every function that forgets to be generic will
+treat the payload as what it physically is. `mean` of an `integer64`
+without a method is a nonsense double. The class is law. The SEXPTYPE is
+physics. Code that only knows physics will enforce physics.
+
+`S7::class_any` is a useful decoy. Inspect shows a length-zero `VECSXP`
+with class `"S7_any"`. It is not an S7 class constructor, and it is not an
+`OBJSXP`. It is a base-type object used as a property constraint meaning
+"anything." The slot exists so that a property can name its admitted
+type. Leaving it at `class_any` is a choice, and @sec-types argues it is
+usually the wrong one.
+
+## Promises, dots, and byte code
+
+You meet a `PROMSXP` by forcing the issue: `delayedAssign`, or inspecting
+a formal while a call is live and the argument has not been touched. Dots
+are `DOTSXP`, a pairlist of promises bound to `...`. Byte code is
+`BCODESXP`. The compiler produces it, package loading produces it, and in
+the S7 dumps the parent class `S7_object` already has a byte-coded body
+because the package was built with the compiler on. You did not ask for
+byte code. You asked for S7, and the namespace handed you a compiled
+closure.
+
+None of these require a debugger if you know which expression allocates
+them. They do require you to stop expecting `inspect(1L)` to introduce
+you to the whole zoo. The zoo comes to you when evaluation, compilation,
+or a package constructor needs it.
+
+## External pointers and weak references
+
+These two get conflated because both smell like "systems programming,"
+and they answer different questions.
+
+| | External pointer | Weak reference |
+| --- | --- | --- |
+| Type | `EXTPTRSXP` | `WEAKREFSXP` |
+| Manual's picture | a pointer, a protected R object, and a tag | a length-4 vector: key, value, finalizer, next |
+| Job | name a foreign resource | remember a value only while the key is alive |
+| Death | a finalizer can run when the pointer is collected | when the key dies, the weak reference clears and does not keep the key alive |
+
+An external pointer is how an R object owns a GDAL dataset, a database
+connection, a C++ instance. The R object is the handle you can name,
+protect, and finalize. The bytes live in someone else's allocator.
+`reg.finalizer` is the base-R hook for "run this when the node goes."
+That is the interface principle from Chambers, made concrete: talking to
+other languages includes talking about their lifetimes.
+
+A weak reference is a cache that does not create a leak. The key is an
+environment or an external pointer (or `NULL`). The value is what you
+wanted to remember. The collector is allowed to forget the value when the
+key is otherwise unreachable. Memoisation tables and package registries
+use this so that "I have seen this object" does not become "I will keep
+this object forever."
+
+The user's complaint is correct and worth keeping. The C type being real
+is not the same thing as a base constructor you can teach to a beginner.
+`rlang::new_weakref` is a language-level wrapper. `typeof` on its result
+is `"weakref"`, so once you hold one, R will admit the type exists.
+Building one by hand is a C or package job. `reg.finalizer` is the piece
+base actually exports for the neighboring problem. A lot of "tidyverse
+primitives" have this shape: the runtime grew the capability, and a
+package grew the API. ALTREP classes, a comfortable restart surface, and
+weak maps all sit in that gap. Internals are not the standard library.
+Pretending they are is how people tell you the feature "already exists"
+when what exists is a struct.
+
+## S7 values and R6 handles, at the level of nodes
+
+This is the identity fork, photographed.
+
+An S7 class object is a `CLOSXP`. Calling it allocates an instance. In
+the notebook the instance is an `OBJSXP` whose attributes carry the class
+string and a pointer back at the class. Properties live in that
+structure. `@p <-` went through a replacement function and the address
+changed. Same physics as `df$x <-` on a data frame: value semantics,
+copy-on-modify, a new node for the modified object. The class object
+itself is shared. Instances point back at it. Dispatch is generic
+functions, not messages stored in the instance.
+
+An R6 generator is an `ENVSXP`. The dump is a guided tour of a mutable
+dictionary: a hash table, bindings for `classname` and `public_fields`,
+closures whose enclosing environment is the generator itself, a `clone`
+method whose body builds new environments and remaps closures into them,
+`lockEnvironment`, `reg.finalizer` wired to `$finalize`, and the famous
+`.__enclos_env__` chain. Methods are closures closed over the object
+environment. That is the Scheme model of an object, shipped as a package.
+`$foo <-` does not change the address. Cloning is an explicit walk. The
+giant paste in the notebook is the clone machinery's source, seen from
+the inside, and it is allowed to be ugly. It is doing something the
+value world gets for free.
+
+S7's experimental `class_environment` is the admission that the class
+machinery and the identity regime are separable. You can ask for S7's
+properties and validators on environment physics. The documentation marks
+it dangerous because it *is* dangerous: you have opted out of the value
+illusion while keeping a syntax that looks like the illusion. Use it when
+you mean a handle. Do not use it because an environment seemed like a
+convenient list.
+
+## What the physics does not decide
+
+Knowing that an instance is an `OBJSXP` does not tell you whether `color`
+should be a class. It tells you that if you make it an S7 value, property
+replacement will behave like data-frame replacement, and if you make it
+an R6 object, property replacement will behave like environment
+assignment. The physics constrains the promises you can keep. The
+vocabulary is still your job. That is the hinge into the second half of
+the book.

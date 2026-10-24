@@ -1,0 +1,175 @@
+# Lab Notebook {#sec-lab}
+
+This is the original session, retold as a sequence of probes. The point of
+the retelling is the order. A hypothesis was written down. The next call
+confirmed it, qualified it, or killed it. That rhythm is worth more than
+any particular flag.
+
+The script is a private scratch file. What follows is the part that
+generalizes. Where a printed `REF` count depended on RStudio holding extra
+references, the count is reported as a phenomenon, not as a constant.
+
+## Where `inspect` comes from
+
+The file opens on the right question: is `inspect` itself a SEXP you can
+study, or a door into the C runtime? It is a door. `.Internal(inspect(x))`
+calls `do_inspect`. The value you pass is the SEXP. The printer is an
+entry in the internals table. @sec-header decodes a line. The rest of
+this notebook assumes that decoding.
+
+A classed list (`structure(list(x = 1L), class = "obj")`) showed the whole
+vocabulary at once: a `VECSXP` with `OBJ` and `ATT`, a child `INTSXP`, and
+an attribute `LISTSXP` whose tags were the symbols `names` and `class`.
+Those symbols were locked, saturated, and old (`g1`). The character data
+was a cached `CHARSXP`. One object, three worlds: generic vector, atomic
+vector, cons chain.
+
+## Nil, and the hypothesis that overreached
+
+`NULL`, `c()`, and `pairlist()` shared an address, type 0, `REF(65535)`.
+`identical()` stayed true under the strict switches, including
+`extptr.as.ref = TRUE`. The comment drew the natural conclusion: any
+genuinely empty thing is that cell.
+
+`list()` and `alist()` retired the conclusion for generic vectors. Each
+was a fresh length-zero `VECSXP`. `integer()`, `double()`, `character()`,
+`logical()`, `complex()`, and `raw()` retired it for the atomics. The
+comment had guessed that lists were `VECSXP` *because they need method
+dispatch*. The type is older than that need. Dispatch consults the class
+and the `OBJ` bit. An empty list with no class is already not Nil.
+@sec-empties is the write-up. The primitive-generic vectors printed next
+to the hypothesis (`.S3PrimitiveGenerics`, `.internalGenerics`) are about
+which verbs are wired into C, not about why the empty list exists.
+
+`typeof(character())` is `"character"` and the SEXP type is `STRSXP`. The
+comment's `STRSEXP` was a reasonable coinage. The cache of individual
+strings is the `CHARSXP` layer underneath.
+
+## Primitives
+
+`sum` and `+` and `c` printed as builtins, type 8, saturated, old.
+`[` printed as a special, type 7. Printing a primitive shows
+`.Primitive("sum")` rather than a body. That is the applicative-versus-raw
+split from @sec-in-context, met in the wild. These types are not mythical.
+They are what `typeof` of the function returns, any time you ask.
+
+## A double wearing a class
+
+`bit64::integer64()` has `typeof` `"double"` and inspects as a `REALSXP`
+with `OBJ`, `ATT`, and class `"integer64"`. The comment called this
+interesting and then, later, connected it to factors. Factors felt like
+they might be "more of an object" in the `OBJSXP` sense. They are not.
+`is.object(factor(1))` is true because the `OBJ` bit is set. `typeof` is
+`"integer"`. The historical SEXP types for factors were 11 and 12, and
+they were withdrawn. The "lie about storage" pattern is the living design.
+@sec-in-context keeps the two meanings of "object" apart so they can stay
+apart.
+
+## Conditions, left open on purpose
+
+The long comment is the seed of @sec-signals. Conditions look like a
+CLOS-style system, the surrounding culture uses them as exceptions, and
+errors-as-values (purrr, rlang results, validators) sit nearby unused. The
+comment's own correction is the one to keep: it is S3 on a signaling
+foundation, not CLOS. The resemblance to Pitman is in the *shape* ---
+signal, handle on the live stack, restart --- not in the implementation.
+The frustration with catching an error only to throw another one is a
+layering point, not a reason to abandon signals.
+
+## S7 classes are closures
+
+`S7::class_any` inspected as a length-zero `VECSXP` with class `S7_any`.
+Not a class constructor. `S7::new_class("myclass")` inspected as a
+`CLOSXP` with attributes for the class metadata, a body that calls
+`S7::new_object`, and a parent whose body was already a `BCODESXP` inside
+the S7 namespace. `typeof` of the class object is `"closure"`.
+
+That dump is also where byte code, language objects, and the Nil formal
+list show up without anyone asking for them. A compiled package function
+contains a `BCODESXP`. A call in the body is a `LANGSXP`. An empty formal
+list is Nil. "Types you never see" are types you see the moment the value
+you asked about is implemented with them.
+
+## R6 generators are environments
+
+`typeof(R6::R6Class())` is `"environment"`. The inspect paste is long
+because the generator is an environment full of closures, and the clone
+method's body is a program that allocates more environments, remaps
+function enclosures, locks them, and registers a finalizer for
+`$finalize`. The symbol `<<-` appears inside that generated code. So does
+`.__enclos_env__`. The class attribute on the generator is
+`R6ClassGenerator`.
+
+This is the Scheme object, written out by a code generator. It is also a
+practical demonstration that `<<-` is not foreign to serious R. R6 uses
+superassignment *inside a known enclosure*, the object environment it just
+built. That is the declared version. The fragile version is the one where
+the enclosure is whatever happened to call you. Seeing both in the same
+afternoon is how the distinction becomes obvious.
+
+## Weak references
+
+`rlang::new_weakref(new.env(parent = emptyenv()), value = "x")` has
+`typeof` `"weakref"` and inspects as type 23, `WEAKREFSXP`. The comment
+asked whether this is only an rlang convention. The type is a runtime
+type. The comfortable constructor is a package. `reg.finalizer` is what
+base gives you for the adjacent problem. @sec-in-context puts external
+pointers next to weak references so the two stop sharing a single vague
+reputation.
+
+The same stretch of the file quotes the internals manual on a fossil:
+"user databases," apparently the old Omegahat `RObjectTables` package, an
+undocumented lookup hook. It is a good reminder that the manual still
+contains archaeology. Read it next to the source when a sentence seems
+to describe a feature you have never seen. Sometimes the feature is real
+and hidden. Sometimes it is a scar.
+
+## The question the dumps were heading toward
+
+The file then states the design question cleanly. Reference semantics
+make in-place change observable, which is what you want for invalidation,
+caches, and anything reactive. Values plus replacement functions can
+imitate some of that, at the cost of a new object. Low-level facts do not
+design a package by themselves. They tell you which promises the package
+is allowed to make. The rest of the file is an S7 experiment that takes
+the promise seriously.
+
+## An S7 assignment changes the address
+
+`s_x` was defined with a single `class_any` property. The class object was
+a `CLOSXP`. An instance was created. `lobstr::obj_addr` was recorded.
+`my_x@p <- "aaa"` was evaluated. The address changed. The new node was an
+`OBJSXP` with `OBJ` and `ATT`, class `c("s_x", "S7_object")`, a pointer
+back at the class, and a property record whose visible names included
+`name`, `class`, `getter`, `setter`, and `validator`.
+
+That is the value illusion, holding, for a class system that people
+sometimes describe as "more OO" and therefore somehow reference-like. The
+replacement syntax looks like mutation. The address says a new value was
+born. R6 would have kept the address. The two dumps together are the
+fork in @sec-illusion and @sec-containers, obtained before any of those
+chapters were written.
+
+The property record is the other souvenir. The slots for a strict
+property were present and, in this definition, empty. @sec-types hangs
+the authoring argument on that observation. The docs can show `class_any`.
+The node still has a place to put a validator. The next person who defines
+`p` gets to decide whether the place stays empty.
+
+## What to rerun
+
+When a R release moves, the probes worth repeating are the ones the
+verification script already pins, plus three that need a human eye:
+
+- `inspect(1:1e9)` and see whether you are looking at an ALTREP node
+  rather than a billion integers
+- `lobstr::ref` before and after `x[1] <-` on a shared vector, and watch
+  the count force a copy
+- a `withCallingHandlers` / `withRestarts` pair small enough to feel the
+  stack stay alive, next to a `tryCatch` that unwinds it
+
+The script in `verification/` guards the claims that should not drift:
+Nil's identity with `c()` and `pairlist()`, the independence of `list()`,
+the types of the typed empties, the factor representation, and builtin
+versus special. If one of those fails, the book is describing a different
+R than the one you have, and the book loses.

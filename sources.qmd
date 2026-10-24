@@ -1,0 +1,117 @@
+# Sources {#sec-sources}
+
+The chapters link out at the point of use. This is the same shelf, grouped
+so you can see what kind of document each one is. Manuals beat blog posts.
+Source beats manuals when they disagree. Papers beat this book's readings
+of the papers.
+
+## The runtime, primary
+
+- [R Internals](https://cran.r-project.org/doc/manuals/r-release/R-ints.html),
+  for R 4.6.1 (2026-06-24). SEXPTYPEs, the header, allocation classes,
+  environments, attributes, special primitives, the character cache. The
+  manual warns that it is a work in progress. Believe it, and check the
+  source when a sentence is load-bearing.
+- [The R Language Definition](https://cran.r-project.org/doc/manuals/r-release/R-lang.html).
+  The C-syntax / Lisp-and-APL-semantics paragraph, and the chapter on
+  computing on the language.
+- [`src/main/memory.c`](https://github.com/wch/r-source/blob/trunk/src/main/memory.c)
+  in the `wch/r-source` mirror. Nil's initialization, node classes, the
+  generational heap. The comment "or armageddon happens" is not a joke you
+  need to improve on.
+- [`src/include/Defn.h`](https://github.com/wch/r-source/blob/trunk/src/include/Defn.h).
+  `REFCNTMAX`, `MARK_NOT_MUTABLE`, the increment and decrement macros that
+  refuse to move a saturated count.
+- Luke Tierney,
+  [Notes on Reference Counting in R](https://developer.r-project.org/Refcnt.html).
+  The design note from when reference counting was still opt-in. Read it
+  for motivation and for the list of holders that deliberately do not
+  count. Do not read it as a description of the compile flags in a current
+  release. Current dumps print `REF(n)` because the switch happened.
+- Luke Tierney, Gabe Becker, and Tomas Kalibera,
+  [ALTREP: Alternative Representations for R Objects](https://svn.r-project.org/R/branches/ALTREP/ALTREP.html).
+  The design note. The 2017 DSC slides circulate as
+  [a PDF](https://www.r-project.org/dsc/2017/slides/dsc2017.pdf); the tech-doc
+  index is
+  [developer.r-project.org/TechDocs](https://developer.r-project.org/TechDocs/).
+
+## The language, primary
+
+- John M. Chambers,
+  [S, R, and Data Science](https://journal.r-project.org/articles/RJ-2020-028/),
+  *The R Journal* 12/1 (2020). The three principles, in his wording, with
+  the 1976 blackboard and the reason there are no scalars. The book he
+  points at is *Extending R* (Chapman and Hall/CRC, 2016), pages 4--11.
+- Ross Ihaka and Robert Gentleman,
+  [R: A Language for Data Analysis and Graphics](https://doi.org/10.1080/10618600.1996.10474713),
+  *Journal of Computational and Graphical Statistics* 5/3 (1996).
+- Floréal Morandat, Brandon Hill, Leo Osvald, and Jan Vitek,
+  [Evaluating the Design of the R Language](https://doi.org/10.1007/978-3-642-31057-7_6),
+  ECOOP 2012.
+- Hadley Wickham, [*Advanced R*](https://adv-r.hadley.nz/), 2nd ed., 2019.
+  In particular
+  [names and values](https://adv-r.hadley.nz/names-values.html),
+  [environments](https://adv-r.hadley.nz/environments.html),
+  [object systems](https://adv-r.hadley.nz/oo.html),
+  and [conditions](https://adv-r.hadley.nz/conditions.html).
+- Hadley Wickham,
+  [A Layered Grammar of Graphics](https://doi.org/10.1198/jcgs.2009.07098),
+  *Journal of Computational and Graphical Statistics* 19/1 (2010).
+  Wilkinson's *Grammar of Graphics* (Springer, 2005) is the prior
+  vocabulary.
+- [httr2](https://httr2.r-lib.org/articles/httr2.html),
+  [ellmer](https://ellmer.tidyverse.org/),
+  [cli](https://cli.r-lib.org/),
+  and [rlang::try_fetch()](https://rlang.r-lib.org/reference/try_fetch.html).
+- The companion design manual:
+  [S7 Design Notes](https://docs.jimbrig.com/s7-design-notes/).
+
+## Conditions, types, and shells
+
+- Kent M. Pitman,
+  [Condition Handling in the Lisp Language Family](https://nhplace.com/kent/Papers/Condition-Handling-2001.html)
+  (2001). The Common Lisp mechanism itself is
+  [HyperSpec chapter 9](http://www.lispworks.com/documentation/HyperSpec/Body/09_.htm).
+- Alexis King,
+  [Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/)
+  (2019).
+- John Launchbury and Simon Peyton Jones, "Lazy Functional State Threads,"
+  POPL 1994. The paper behind `runST`.
+  [Microsoft Research hosts the publication](https://www.microsoft.com/en-us/research/publication/lazy-functional-state-threads/).
+- Gary Bernhardt,
+  [Boundaries](https://www.destroyallsoftware.com/talks/boundaries).
+  Functional core, imperative shell. The talk is the source of the phrase
+  as used here.
+- Eric Evans, *Domain-Driven Design* (Addison-Wesley, 2003). Ubiquitous
+  language. The enterprise apparatus is optional; the vocabulary is not.
+- [The Rust book, chapter on traits](https://doc.rust-lang.org/book/ch10-02-traits.html)
+  and the [Rust API guidelines](https://rust-lang.github.io/api-guidelines/).
+  Read these before repeating the "R is just like Rust" line to someone
+  who writes Rust. The shared posture is open operations over types. The
+  ownership story does not transfer.
+
+## PowerShell and the view layer
+
+- Jeffrey P. Snover, the Monad manifesto, 8 August 2002.
+  [Microsoft Learn](https://learn.microsoft.com/en-us/powershell/scripting/developer/monad-manifesto)
+  hosts it;
+  [the PDF](https://jsnover.com/Docs/MonadManifesto.pdf)
+  is the text. "Instead of piping unstructured text, we pipe .NET objects."
+- [about_Output_Streams](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_output_streams)
+  and
+  [about_Redirection](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection).
+  Stream numbers. See the [open question](open-questions.qmd) on the
+  version-introduced discrepancy before you cite a year.
+- [about_Format.ps1xml](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_format.ps1xml).
+  Views affect display only. Built-in views moved into source in
+  PowerShell 6. The separation is the idea; the XML is the aged vehicle.
+
+## What not to cite this book for
+
+Do not cite it for a guarantee about a future R, or for S7 behavior past
+what the S7 design notes have rechecked. Do not cite the Cairo / WinFS
+paragraph as a history of .NET; it is a warning against a bad history.
+Do not cite a `REF` count from an IDE session as a property of an
+expression. Cite the manuals, the source, and the probes in
+`verification/` for anything that has to survive contact with a different
+machine.

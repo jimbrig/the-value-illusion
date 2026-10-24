@@ -1,0 +1,110 @@
+# Open Questions {#sec-open}
+
+A reading gets to live in a chapter when a manual, the source, or a probe
+supports it. These are the ones that do not clear that bar yet. They are
+recorded so the chapters do not quietly upgrade them into mechanisms.
+
+## The symbol `gp` bits
+
+Inspect lines for symbols in the original session carried `gp` values such
+as `0x4000`, `0x5000`, `0x6000`, `0x7000`, and `0x8000`, often next to
+`LCK` and "(has value)". `CHARSXP` lines carried smaller values such as
+`0x60` and `0x61`, and inspect already translated the part a human needs
+(`ASCII`, `cached`). The general-purpose field is sixteen bits whose
+meaning depends on the type. The
+[CHARSXP encoding section](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Encodings-for-CHARSXPs)
+covers one dialect. The symbol dialect lives in the source, and this book
+does not publish a decoded table it has not checked bit by bit against
+that source.
+
+What would close it: a short comment in `src/main/inspect.c` or the symbol
+macros in the headers, quoted next to one fresh dump, for the current R.
+
+## Does inspect suppress `REF(0)`?
+
+Empty vectors in the session printed an empty bracket. Saturated and
+shared nodes printed `REF(n)`. The reading in @sec-header is that a
+missing token means "nothing worth printing," not "this node has no count
+field." The field exists either way: under the reference-counting build
+it is the 16-bit `named` slot.
+
+What would close it: the `Rprintf` in `do_inspect` that emits `REF(%d)`.
+If it is guarded by a non-zero test, the reading becomes a mechanism. Until
+then, do not write code that infers a zero count from the absence of the
+token.
+
+## The sixth name on an `S7_property`
+
+A property built as `class_any` inspected as a length-6 record. The paste
+showed `name`, `class`, `getter`, `setter`, and `validator`, and elided
+the last name. @sec-types refuses to guess it. The argument does not
+depend on the sixth name. The five that are visible already include the
+slots a strict property would fill.
+
+What would close it: `S7:::prop_names()` or the constructor in the S7
+sources for the installed version, plus one inspect that does not elide.
+
+## Does S7 pin the class at `REFCNTMAX`?
+
+Before the replacement, the class closure in the session had a finite
+`REF`. Inside the instance dump after `@p <-`, the class node appeared
+saturated. That can happen because many holders exist (the instance, the
+binding, the IDE, internal caches) or because something called
+`MARK_NOT_MUTABLE`. Saturation is a one-way door in the macros: once the
+count hits the ceiling, decrement will not bring it back. Treating "S7
+classes are immortal" as a mechanism would be an overread of one dump.
+
+What would close it: a quiet session, `lobstr::ref` on the class before
+and after instantiation, and a look at whether S7 sets the count on
+purpose.
+
+## Base-level constructors for weak references
+
+The session reached for `rlang::new_weakref` and got a real `WEAKREFSXP`.
+`reg.finalizer` is base. A user-facing weak-map constructor in base, of
+the same shape as rlang's, was not part of the session and is not claimed
+here. The distinction between "the runtime has the type" and "the standard
+library hands it to you" is the point of that section. A future base
+function would narrow the gap without changing the type.
+
+## `1:n` and ALTREP, on this R
+
+The design of ALTREP is documented. The session that seeded this book did
+not paste `inspect(1:1e9)`. Whether a given R build still represents that
+sequence compactly, and how inspect spells the ALTREP class name, is a
+probe worth running and not a fact this text pretends to have run.
+
+## User databases
+
+[R Internals on environments](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Environments-and-variable-lookup)
+still mentions "user databases" and points, a bit sheepishly, at the
+former Omegahat package `RObjectTables`. The manual calls the hook
+under-documented. Treat it as archaeology until you have a current C
+caller. It is not a third environment model you should design a package
+around.
+
+## Two PowerShell docs, one introduction date
+
+[about_Output_Streams](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_output_streams)
+and
+[about_Redirection](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection)
+agree on the stream numbers and disagree, in places, about which
+PowerShell version introduced warning, verbose, and debug as redirectable
+streams. This book uses the numbers and the roles, which agree, and does
+not adjudicate the version history.
+
+## What would change a recommendation
+
+The container split (value for facts, handle for capabilities) would
+weaken if ordinary S7 replacement stopped changing object identity, or if
+environments grew copy-on-modify of their bindings. Neither is likely.
+The recommendation to fill S7 property slots instead of checking in
+methods would weaken if property validators stopped running on
+replacement. The S7 design notes keep a ledger of that kind of
+version-sensitive mechanic; defer to it for S7 behavior, and re-check
+after a major S7 release.
+
+The recommendation to prefer calling handlers over `tryCatch` would not
+survive a problem whose correct policy is always "this attempt is over."
+It is a default, not a law. The law is that the choice should be made on
+purpose, in one place, with a class a caller can see.

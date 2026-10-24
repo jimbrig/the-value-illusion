@@ -1,0 +1,198 @@
+# The Value Illusion {#sec-illusion}
+
+Copy-on-modify feels like a magic trick because a 5 GB data frame can
+lose one cell and the machine does not blink. The feeling is accurate.
+The explanation is ordinary, once you are willing to look at three
+mechanisms that were built decades apart and happen to serve the same
+illusion.
+
+The public rule: ordinary objects behave as values. Binding a new name
+does not copy. Modifying through one name does not change the other name.
+The private rule: nodes are shared until a write, and a write copies only
+when the reference count says someone else still cares.
+
+```{mermaid}
+flowchart TD
+  bind[Another name is bound] --> share[Same node, count goes up]
+  share --> read[A read]
+  read --> share
+  share --> write{Write, and is the count above 1?}
+  write -->|yes| dup[Duplicate, then mutate the copy]
+  write -->|no| inplace[Mutate this node]
+  dup --> readers[Other names keep the old node]
+  inplace --> readers2[There were no other names]
+```
+
+That is {{< glossary "copy-on-modify" >}}. It is not a copy on every
+touch, and it is not mutation of a shared value. It is a copy at the
+moment a write would otherwise be visible through a second name.
+
+## From NAMED to a real count
+
+Before R 4.0 the bit that answered "may I mutate this?" was `NAMED`, and
+it was a terrible counter. It went up to 2 and almost never came back
+down. A value that had ever been shared stayed "maybe shared" forever, so
+later writes copied even when every other holder had already gone away.
+Luke Tierney's
+[notes on reference counting](https://developer.r-project.org/Refcnt.html)
+are the design argument, written while the new scheme was still something
+you compiled in with `SWITCH_TO_REFCNT`. They are a historical document
+with a living conclusion. Read them as the motivation, then look at a
+modern dump: `REF(n)` is the count, and the macros in `Defn.h` increment
+and decrement it at the same assignments that maintain the generational
+write barrier.
+
+The write barrier is the part worth understanding, because it explains why
+the bookkeeping is affordable. A generational collector has to notice when
+an old node grows a pointer to a young one, or the young one gets
+collected while the old one still needs it. Those assignment sites already
+existed. Reference counting hitchhiked on them: store a new pointer,
+increment the new target, decrement the old one. The value illusion is
+what that bookkeeping buys the user.
+
+A few holders deliberately do not count. Tierney lists `.Last.value`, the
+left-hand side of a complex assignment, and some internal argument lists
+built with `CONS_NR` so that merely *calling* a function does not pin the
+arguments into permanent sharing. This is why a count is not a moral fact
+about your code. It is a census of whoever the runtime and the IDE have
+chosen to track.
+
+The practical consequences, all visible from user level and spelled out in
+[Advanced R](https://adv-r.hadley.nz/names-values.html):
+
+- `x <- y` shares. `tracemem` or `lobstr::obj_addr` will agree.
+- `y[1] <- 0` on a shared atomic vector allocates a new vector for `y`.
+- Replacing one column of a data frame duplicates the list of columns and
+  the one column you replaced. The other columns keep their addresses.
+  That is the 5 GB frame that "copies" without copying 5 GB.
+- A count of 1 means the runtime believes you are the only holder, and a
+  primitive is allowed to modify the node in place. This is a promise
+  about the implementation, not a license to depend on in-place behavior
+  in package code unless you are writing C and have checked the count
+  yourself.
+
+Environments do not play this game. Assigning into an environment mutates
+the frame. The reference count still tells you how many names point at
+*that environment*. It does not trigger a duplicate-on-write of the
+bindings. An environment with `REF(11)` is a popular handle, not a value
+that is about to be copied for your safety. The global environment is
+saturated and locked because it is part of the process.
+
+## ALTREP is the same idea, one floor down
+
+Reference counting avoids copies of data you already materialized.
+{{< glossary "ALTREP" >}} avoids materializing the data.
+
+The design note by Tierney, Becker, and Kalibera,
+[ALTREP: Alternative Representations for R Objects](https://svn.r-project.org/R/branches/ALTREP/ALTREP.html),
+is the primary source, with the 2017 DSC slides and the 2018 tech note
+listed from
+[developer.r-project.org](https://developer.r-project.org/TechDocs/).
+The goal is representational freedom under a stable `SEXPTYPE`. To
+existing C code an ALTREP integer still looks like an `INTSXP`. The
+payload can be something else:
+
+- a compact arithmetic sequence, so `1:1e9` does not allocate a billion
+  integers
+- a deferred conversion of strings
+- a memory-mapped or distributed vector
+- metadata such as "sorted" or "no NAs," so a later question can be
+  answered without a scan
+- in the original sketch, even an alternative shape for environments
+
+The abstract classes (`ALTREP`, `ALTVEC`, `ALTINTEGER`, `ALTREAL`,
+`ALTSTRING`, …) are fixed to the existing type tags. There is no user
+hierarchy of representations. A method can return a C `NULL` to mean
+"fall back to the ordinary protocol," which is why the feature could land
+in a thirty-year-old interpreter. `Dataptr_or_null` is the polite
+question: give me the data if it is already here, and do not allocate if
+it is not. `Extract_subset` is how a slice of a compact sequence stays
+compact.
+
+This is the same family of idea as a buffer protocol or a view: the type
+tag is the contract, the bytes are a choice. It is also why "I assigned
+`1:n` and the memory graph did not move" is not evidence that R is
+reference-semantic. It is evidence that the sequence was never a pile of
+boxes to begin with. Force the payload --- `inspect` is often enough, or
+any operation that needs a real data pointer --- and the boxes appear.
+
+The `alt` bit in the header is the flag. Combined with the allocation
+class, it tells you whether you are looking at a node that owns bytes or
+a node that knows how to produce them.
+
+## Promises are the calling convention
+
+Arguments are not passed as values. They are passed as
+{{< glossary "promise" >}}s: a `PROMSXP` holding the expression, the
+environment in which to evaluate it, and eventually the value. The manual
+states the lifecycle in one sentence. Once the promise has been forced,
+the environment pointer is set to `NULL` and the value is remembered.
+Force-once. After that, the argument is just a value with a history.
+
+That is why the public phrase "pass by value" is a description of the
+illusion, not of the calling convention. The convention is: pass by
+promise, share until a write, duplicate if the count says the write would
+leak. Laziness here is not Haskell's laziness. Haskell delays evaluation
+to keep expressions referentially transparent and to permit infinite
+structures. R delays evaluation so that a plot can use the expression you
+typed as a label, so that a default argument can mention another argument,
+and so that non-standard evaluation has something to capture. The cost is
+evaluation-order surprises. The benefit is the part of the REPL that feels
+like talking.
+
+Specials and builtins are the exception that proves the rule, and they
+get their own section in @sec-in-context. A special does not even build
+the promises. It receives the arguments raw.
+
+## `<<-` is mutation with the receiver left blank
+
+The discomfort with `<<-`, set next to the comfort with environments, is
+not hypocrisy once you separate mutation from *finding the thing you
+mutate*.
+
+`<<-` walks the enclosure chain, the same walk a free variable uses on the
+way out, and assigns into the first binding it finds, or into the global
+environment if it finds none. The target depends on who enclosed the
+function. Move the function, wrap it, `local()` it, put it in a package
+namespace, and the walk can land somewhere else. The mutation is real.
+The receiver is implicit. That is a fragile API even when the memory
+model is doing exactly what it was asked.
+
+An explicit environment, or an R6 object, or an S7 object whose parent is
+`class_environment`, names the receiver. Aliases see the same mutation
+because identity is the point. You can pass the handle, fake it in a
+test, and refuse to let a helper go fishing in its parents. Both
+techniques modify shared state. One of them puts the shared state in the
+signature.
+
+The social rule "never use `<<-`" is a documentation rule that got
+promoted to a moral one. The memory-model rule underneath it is better:
+do not mutate through a search. If identity matters, hold the object. If
+identity does not matter, return a value and let copy-on-modify do its
+job.
+
+Haskell's `ST` monad is the typed version of the same instinct. The paper
+is Launchbury and Peyton Jones, "Lazy Functional State Threads" (POPL
+1994): you may mutate inside a scope, and `runST` will not let the
+mutable references escape, so the outside world still sees a pure
+function. R can imitate the pattern --- scratch environment in, list or
+S7 value out --- and has no type system that can enforce the boundary.
+The fence is a convention you write down. Package code that returns the
+handle by accident has broken the fence, and nothing in the language will
+clear its throat.
+
+## What the illusion is for
+
+The illusion is for reasoning. A function that takes a data frame and
+returns a data frame can be read as a transformation of a value, even
+though the columns you did not touch are shared and the sequence you did
+not expand is still compact. Tests can compare values. Pipes can be
+reread. Names do not secretly observe each other's later assignments.
+
+The illusion is a lie for exactly the objects where observation is the
+feature: environments, external pointers, weak references, and reference
+classes built on top of them. Chambers' principles say everything is an
+object and everything that happens is a function call. They do not say
+every object has value semantics. The dumps are where you learn which
+objects opted out. Designing as if they all opted in, or as if none of
+them did, is how packages get either haunted state or tragic performance.

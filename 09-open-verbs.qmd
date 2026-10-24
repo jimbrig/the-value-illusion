@@ -1,0 +1,138 @@
+# Open Verbs {#sec-verbs}
+
+Decapsulating methods is a bet that a domain is an algebra. The verbs are
+the operations. The types are the elements they operate on. Extensibility
+means a new element can join an old operation, or a new operation can be
+defined on old elements, without anyone opening the type and adding a
+method to its private table.
+
+R made that bet early, because statistics is full of operations that apply
+to more than one kind of thing: `print`, `plot`, `summary`, `predict`,
+`coef`, `[`. A model object does not contain the verb `predict`. The verb
+exists, and methods attach to it. Rust made a related bet for different
+reasons, and the resemblance is real if you do not sand off the parts that
+do not resemble.
+
+## Generic functions
+
+In the generic-function tradition, the operation is a function and the
+method is chosen from the arguments. CLOS is the carefully designed
+version: multi-argument dispatch, method combinations, classes that do
+not own their behavior. S3 is the casually designed version that won: a
+naming convention, a search along the class vector, first-argument
+dispatch unless you reach for something richer. S4 adds formality and
+multiple dispatch. S7 keeps S3's compatibility and adds a class and
+property model worth using. [Advanced R's object-oriented
+chapter](https://adv-r.hadley.nz/oo.html) sorts these without pretending
+they are one system.
+
+The user's daily experience of the bet:
+
+- a new package implements `format.my_class` and the console changes
+- a new package implements `predict.my_model` and old code starts working
+- nobody subclasses the original type
+- the verb stays a function, so it can sit in a pipe, a script, or a shell
+
+Message-passing inverts the sentence. `obj.predict()` asks the object
+which method to run. Discovery is "what does this object know?" Extension
+is subclassing, wrapping, or patching. Python and JavaScript made this
+the default and it fits simulation-shaped problems: widgets, game
+entities, documents with a long identity, ORMs whose rows really are
+handles. It fits data work only after you build a second, functional
+layer on top and try not to talk about it.
+
+R has both, and the culture never fully picked. R6 and reference classes
+are the message-passing wing. S3/S4/S7 are the generic-function wing. The
+winning user interfaces in statistics and in the tidyverse are still
+`verb(noun)` or `noun |> verb()`. `$` exists. It is not a moral failure to
+use it on a handle. It is a clue that you have built a handle.
+
+## What Rust actually shares
+
+Rust methods are sugar over functions. `value.method(args)` is
+`Type::method(value, args)` or `Trait::method(value, args)`. There are
+two places a method can come from:
+
+- an **inherent** `impl Type` block, which is closed: only the crate that
+  owns the type adds these
+- a **trait** implementation, which is open in a controlled way: other
+  crates can implement the trait for their own types
+
+The
+[traits chapter of the Rust book](https://doc.rust-lang.org/book/ch10-02-traits.html)
+is the mechanism. The
+[API guidelines](https://rust-lang.github.io/api-guidelines/) are the
+culture: types carry invariants, traits carry shared behavior, and a lot
+of the surface area of a good crate is functions. Ownership and lifetimes
+have no R equivalent, and pretending otherwise is how the comparison gets
+cute and then wrong. The comparison that holds is the shape of the code
+you read. You navigate a vocabulary of functions. Types are the backbone
+those functions accept. Dispatch is a property of the operation. A new
+type can join `Display`, or `predict`, without editing the original
+module.
+
+Rust's orphan rules are the part R deliberately does not have. A trait
+implementation has to be coherent: you cannot have two crates each
+defining `Display` for the same foreign type and then wonder which one
+runs. R will happily let the next attached package mask a method, and
+`UseMethod` will pick whatever is found first on the search path. That is
+the extensibility and the footgun in one rule. Packages manage it with
+conventions, imports, and a refusal to define methods for classes they do
+not own unless that is the whole point of the package. The footgun is not
+an argument against open verbs. It is an argument for a curated
+vocabulary, which is the same argument the naming section already made.
+
+## Naming as the module system you actually use
+
+Thinking in functions and shell-like procedures matches how you navigate
+a codebase under this bet.
+
+- `api_config_new`, `api_client_fetch`, `color_brightness`
+- `check_*`, `as_*`, `format_*`, `req_*`
+- Rust's `module::function`
+
+The prefix is the module. The package namespace is the fence. IDE
+navigation is symbol search over a vocabulary you chose, which is the
+same muscle as a good CLI. Encapsulation, in this style, means three
+things and refuses a fourth:
+
+- **semantic:** illegal states do not parse
+- **nominal:** the names are stable and the namespace is real
+- **disciplinary:** effects and handles are obvious in the signature
+- not: every verb hides behind `self.`
+
+Dot-driven objects optimize for one blob of state with a toolbox
+attached. Function-and-type systems optimize for pipelines, scripts, and
+verbs that apply to more than one noun. Data work is the second shape.
+So are HTTP clients, tool-using model loops, and compilers. When an R
+codebase feels like Java with the classes rubbed off, it is usually
+because the verbs were never written down as verbs. The methods exist,
+scattered across files named after nouns, and the user interface is
+whatever you discover by typing `$` and waiting.
+
+## Algebras, not simulations
+
+The cold version of the strength:
+
+A simulation asks "what does this thing do next?" An algebra asks "what
+operations exist on these things, and which laws do they obey?" R's
+generic functions are a bet on the second question. So are Rust traits,
+CLOS generic functions, and type classes in Haskell. Python's classes are
+a bet on the first, with protocols and `functools.singledispatch` as the
+escape hatches for people who wanted the second bet after all.
+
+Your preference is not anti-object. It is objects as a facade over a
+functional surface. Types carry meaning. Generics carry extensibility.
+Functions are what humans, pipes, and shells invoke. That is a coherent
+production style. It is one of the real reasons to stay in R when the
+alternative is an object graph that can do anything and explains nothing.
+
+The style has a failure mode worth naming. A vocabulary nobody curates
+becomes a junk drawer of verbs: three ways to say "fetch," methods
+defined for classes the package does not own, generics with a single
+method that should have been a function. Open dispatch is valuable when
+there is a second implementation in sight, or a stranger who might write
+one. A private function is a fine verb. Not everything has to dispatch.
+The test is whether a new noun should be able to join without editing the
+call sites. If yes, write the generic. If no, write the function and keep
+the name clean.

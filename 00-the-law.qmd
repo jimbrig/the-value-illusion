@@ -1,0 +1,125 @@
+# The Law {#sec-law}
+
+The dumps and the design argument are the same conversation seen at two
+distances.
+
+Up close, R is a heap of tagged nodes, a generational collector, a
+reference count, a promise, and a handful of objects that really are
+mutable. From a package away, the useful question is which of your names
+are allowed to be those mutable objects, and which names are facts that
+must survive being passed around, printed, tested, and serialized.
+
+Hold both distances at once and a law falls out. It is not an R law. It
+is a law about programs that have to stay honest while the data is still
+being discovered.
+
+## Name it
+
+A name is a decision that a concept exists.
+
+`api_config` is a decision. `color` is a decision. `status_code` is a
+decision if a bare integer would lie. The ubiquitous language Eric Evans described in *Domain-Driven Design*
+for large domains is the same discipline scaled down to one package, or
+one person's system: the words in the code, the words in the console, and
+the words in your head are the same words, and you curate them. You do not inherit a vocabulary by subclassing someone else's
+nouns. You write one, and you keep it small enough to defend.
+
+Naming is also the encapsulation. A prefix, a package namespace, and a
+stable verb are how a reader finds the operation. `api_config_new`,
+`req_headers`, `format.foo` --- the module is the vocabulary, not a living
+object you have to open to discover what it can do. Shells have worked
+this way for decades. So do the R APIs that people actually love to call.
+
+## Admit only valid values
+
+A name that accepts anything is a comment.
+
+The standard worth stealing is Alexis King's, from
+[Parse, don't validate](https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/):
+construction *is* the check. Downstream code receives a value that already
+means the name, and it stops re-asking. In a language with a real type
+checker this is a theorem. In R it is a ritual you can house in an S3
+constructor (`new_*`, `validate_*`, `as_*`) or in an S7 property and a
+class validator. The housing is a tradeoff, discussed in
+@sec-types. The requirement is not. If the work is production work, invalid
+states are a bug at the boundary, not a vibe you check in the third method
+that happens to care.
+
+R will not make you do this. That is the whole difficulty, and it is also
+why the REPL is such a good place to discover which names deserve the
+ceremony. Discovery first. Then the parse.
+
+## Show it well
+
+A type is not done when it can be constructed. It is done when a human can
+see what it means.
+
+R already treats the console as a user interface: `print`, `format`,
+`str`, and the semantic vocabulary in
+[cli](https://cli.r-lib.org/). PowerShell went further and made the view
+a separate, declarative contract
+([format data](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_format.ps1xml),
+sitting on the
+[Monad manifesto](https://learn.microsoft.com/en-us/powershell/scripting/developer/monad-manifesto)'s
+rule that the pipe carries objects and the host decides how they look).
+The idea travels even though the XML does not. Skipping `format` is the
+same kind of unfinished as skipping the validator: the value exists, and
+nobody can read it.
+
+Effects need the same courtesy. A warning, a progress meter, a verbose
+trace, and a fatal error are different channels. Smashing them into
+`cat()` throws away the only protocol R has for routing them. That
+protocol is the condition system, and it is closer to
+[Common Lisp](https://nhplace.com/kent/Papers/Condition-Handling-2001.html)
+than the `tryCatch` habit suggests. @sec-signals goes into it.
+
+## Extend it with verbs
+
+The operation is the extension point.
+
+R's generic-function tradition (S3, S4, S7) and the trait tradition in
+[Rust](https://doc.rust-lang.org/book/ch10-02-traits.html) share a
+posture: a new package can teach an old verb a new noun, or teach an old
+noun a new verb, without owning the type's method table. Message-passing
+objects invert the posture. The type owns the verbs, and extension leans
+on subclassing or patching. Both are legitimate. They fit different
+problems. Data work, HTTP, compilers, and tool-using models are usually
+algebras --- verbs closed over types --- and they want the open verb.
+Widgets, documents with identity, and long-lived sessions sometimes want
+the closed object. R lets you build either, which is freedom and also how
+a codebase loses the plot.
+
+The practical shape that keeps showing up:
+
+```{mermaid}
+flowchart LR
+  data[Domain data] --> names[Names]
+  names --> types[Values that admit only those names]
+  types --> verbs[Verbs and generics]
+  types --> views[Print, format, cli]
+  verbs --> workflows[Workflows as composition]
+  handles[Handles at the edge] --> workflows
+  views --> host[The host]
+```
+
+Values in the middle. Handles at the rim, where identity is load-bearing:
+a socket, a token that refreshes, a cache, a conversation. Verbs
+everywhere a human or a pipe might call them. Views at the host.
+
+## Two sentences, one book
+
+Chambers compressed S and R into three principles, restated in
+[*S, R, and Data Science*](https://journal.r-project.org/articles/RJ-2020-028/):
+everything that exists is an object, everything that happens is a function
+call, and interfaces to other languages are part of the language. The law
+above is what those principles feel like when you are the one shipping the
+package.
+
+The metal chapters show why the value illusion holds, and where it is
+contractually false. The hybrid chapters show why the language grew this
+shape and why rigor feels like swimming upstream. The taste chapters are
+the law applied: containers, runtime types, presentation, dispatch.
+
+If you remember one recommendation, remember the split. Facts are values.
+Capabilities are handles. Functions are the user interface. The console is
+a view, not a leftover.

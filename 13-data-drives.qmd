@@ -1,0 +1,112 @@
+# Data Drives the Design {#sec-data}
+
+The machinery is secondary. OO or functional, compiled or collected,
+checked by `rustc` or by a constructor: those are how you pay for a
+smaller set of demands.
+
+**Names.** A curated vocabulary. Domain-driven design's ubiquitous
+language, scaled to a package or to one developer's system, not reserved
+for a program with the word "enterprise" in the brief. The names are the
+model. If you cannot say the sentence without inventing a noun, the model
+is missing a noun. If you have three nouns for one fact, the model is
+avoiding a decision.
+
+**Types.** A name admits only valid, structured values. The structure is
+known. The meaning is the name, not the payload. An `integer64` that is
+secretly a double is a tolerated lie at the physics layer; at the
+vocabulary layer the name still has to mean a 64-bit integer, and the
+verbs have to keep the lie from leaking. A `status` that is secretly any
+string is a lie at the vocabulary layer, which is worse, because nothing
+downstream can recover the five legal values by inspecting the SEXPTYPE.
+
+**Views.** How a value appears is configurable in the best systems and
+hand-written in R, and in both cases it is part of the contract. The view
+is not the value. Format at the host.
+
+**Verbs.** Functions do the work. Open dispatch attaches them to types
+without trapping them inside types. A workflow is a composition of verbs
+that values flow through. When a step needs identity --- a socket, a
+token, a conversation --- the value flowing through is a handle, and the
+handle is explicit.
+
+**Data first.** The shapes in the domain drive the types. You do not
+start from a class hierarchy you admired in another codebase and pour the
+data in. You start from the record, the enum, the document, the event,
+and you ask what must be true of each. The functions arrive when the
+shapes can survive a round trip through a verb without losing a law.
+
+```{mermaid}
+flowchart TB
+  subgraph domain [The domain]
+    records[Records and documents]
+    enums[Enumerations]
+    events[Events and failures]
+  end
+  subgraph program [The program]
+    parse[Parse at the boundary]
+    values[Named values]
+    verbs[Verbs]
+    views[Views]
+    handles[Handles]
+  end
+  records --> parse
+  enums --> parse
+  events --> parse
+  parse --> values
+  values --> verbs
+  values --> views
+  handles --> verbs
+  verbs --> values
+```
+
+Everything earlier in the book is a detail under this picture.
+
+The header, the three empties, cons against vectors, reference counts,
+ALTREP, and promises explain why the values in the middle can be cheap
+and still behave like values. The context chapter explains why a handle
+is a different node, not a different mood. Signals explain how failures
+and narration stay structured while the values move. The lineage explains
+why the picture feels natural in R and slightly uphill to enforce. The
+container rules are the picture applied to one API. The type chapter is
+the picture applied to a language that will not write the boxes for you.
+The appearance chapter is the view box, which people skip and users feel.
+
+## What to stop arguing about
+
+Whether a given package is "really OO" is not a useful argument. Whether
+its names are curated, whether its constructors parse, whether its
+printers tell the truth, and whether its verbs are open where a stranger
+should be able to extend them: those are useful arguments. You can win
+them in S3, in S7, in Rust, in PowerShell, in a disciplined corner of
+Python. You can lose them in all five, loudly, with a lot of classes.
+
+Composition over inheritance falls out of the same picture. Inheritance
+bundles "what I am" with "what I can do" and with "how I am stored." The
+picture wants those separable. A subtype is a real tool when the domain
+has a real inclusion and the laws of the parent are laws of the child.
+It is a bad tool when what you wanted was a new verb, or a new view, or
+a nullable field. R's generic functions make the good case easy and the
+bad case unnecessary. You can still build the bad case. The language is
+not going to slap the metaphor out of your hand.
+
+## The stance, small enough to reuse
+
+Treat R as a Scheme-powered array language for having a conversation with
+data. Let the conversation discover the nouns. Then make the nouns
+boring: parsed, printable, and passed to verbs. Keep mutation in handles
+at the edge. Keep foreign runtimes behind interfaces that exchange
+objects and lifetimes, not surprise text. Pick one story for failure at
+each boundary.
+
+The value illusion is what makes the middle of that program pleasant. You
+get to think in values while the runtime shares, delays, and sometimes
+never allocates. The illusion is not permission to forget the edge. At
+the edge, identity is real, the network is real, missingness is real, and
+the user's eye is real. Name those too.
+
+You were not messing around without a goal. You were checking, from the
+node header upward, whether a taste you already had was compatible with
+the machine you actually run. It is. The machine will not write the
+program in that taste. It will only stop punishing you for it, provided
+you stop asking a value to be a handle, a signal to be a string, and a
+name to be a hope.
