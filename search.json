@@ -1,0 +1,1159 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "The Value Illusion",
+    "section": "",
+    "text": "Preface\nThese are field notes from poking R until the abstractions confessed, and then asking what that confession is for.\nThe session that started them had no plan. It called .Internal(inspect()) on NULL, on list(), on a hand-built S3 object, on an environment, on bit64::integer64(), on an S7 class, on an R6 generator, on a weak reference. It pasted the dumps back into the file and argued with them in the comments. The argument turned out to be an old one, wearing new syntax: value against identity, signal against unwind, representation against type, and the question of where a name is allowed to mean only one kind of thing.\nThat sentence organizes the metal. The sentence that organizes the work you do with the metal is shorter, and it showed up later in the same conversation, once the dumps had stopped being the point:\nObject-oriented or functional is a choice of machinery under that law. The data you have to represent drives the names. Functions compose the workflows the data flows through. Everything else in this book is a consequence, a source, or a place the consequence gets sharp.",
+    "crumbs": [
+      "Preface"
+    ]
+  },
+  {
+    "objectID": "index.html#what-kind-of-claim-this-is",
+    "href": "index.html#what-kind-of-claim-this-is",
+    "title": "The Value Illusion",
+    "section": "What kind of claim this is",
+    "text": "What kind of claim this is\nFour registers, and they are not interchangeable.\nA mechanism is something a manual or the R sources state. The claim that there is exactly one NILSXP, R_NilValue, is a mechanism. It lives in R Internals for R 4.6.1, and the initialization in memory.c is blunt about it: that node has to be the first cons cell allocated, or armageddon happens.\nA probe is something a session actually printed. identical(NULL, c()) is TRUE. identical(NULL, list()) is FALSE. An S7 instance changed address across @p &lt;-. Those are facts about a session, and the small verification script re-checks the ones that do not depend on a particular IDE.\nA reading is an interpretation that the mechanism and the probe support. “Empty list() is a zero of the generic-vector type, and that fact is older and deeper than S3 dispatch” is a reading. It can be argued with.\nA recommendation is a way to build. “A client is a handle; a config is a value” is a recommendation. It is earned by the reading, and it can be overruled for a stated reason.\nThe chapters mix the four on purpose. When a sentence is doing one of them, it should be possible to tell. The inquiry ledger is where a reading is still soft.",
+    "crumbs": [
+      "Preface"
+    ]
+  },
+  {
+    "objectID": "index.html#what-this-is-next-to",
+    "href": "index.html#what-this-is-next-to",
+    "title": "The Value Illusion",
+    "section": "What this is next to",
+    "text": "What this is next to\nThe design manual for the type-driven half of this taste already exists, and this book does not pretend to replace it: S7 Design Notes. That book asks what knowledge a model can carry so the rest of the program stops rediscovering it. This one asks what the runtime is already carrying, and which design habits are a truce with that runtime rather than a fight with it.\nAdvanced R remains the best long-form map of names and values, environments, object systems, and conditions. R Internals is the document these notes keep going back to, with the warning printed in the manual itself: it is a work in progress and should be checked against the source. Where the two disagree with a dump, the dump wins for that session and the source wins for the mechanism.",
+    "crumbs": [
+      "Preface"
+    ]
+  },
+  {
+    "objectID": "index.html#how-to-read",
+    "href": "index.html#how-to-read",
+    "title": "The Value Illusion",
+    "section": "How to read",
+    "text": "How to read\nRead The Law if you read one chapter. It is the whole argument in miniature.\nThe metal chapters are a guided decoding of inspect output: the header, the three different empties, cons cells against generic vectors, the machinery under copy-on-modify, the SEXP types you only meet in the right context, and the condition system people keep using as if it were Java.\nThe hybrid chapters are historical, with the romance scraped off. R was built for a conversation with data. That is why the REPL is so good, and why a production package has to impose contracts the language will not impose for you.\nThe taste chapters are the part that should change how a package is shaped: open verbs, where state is allowed to live, runtime types as a substitute for a missing schema layer, presentation as part of the contract, and the data-driven close.\nThe lab notebook walks the original probes in order, including the hypothesis that did not survive the next call. That failure is the best thing in the file.\nPrivate chat is not evidence here. The probes, the manuals, and the papers are. Where a conclusion is the author’s taste, it is labeled as taste.",
+    "crumbs": [
+      "Preface"
+    ]
+  },
+  {
+    "objectID": "00-the-law.html",
+    "href": "00-the-law.html",
+    "title": "1  The Law",
+    "section": "",
+    "text": "1.1 Name it\nThe dumps and the design argument are the same conversation seen at two distances.\nUp close, R is a heap of tagged nodes, a generational collector, a reference count, a promise, and a handful of objects that really are mutable. From a package away, the useful question is which of your names are allowed to be those mutable objects, and which names are facts that must survive being passed around, printed, tested, and serialized.\nHold both distances at once and a law falls out. It is not an R law. It is a law about programs that have to stay honest while the data is still being discovered.\nA name is a decision that a concept exists.\napi_config is a decision. color is a decision. status_code is a decision if a bare integer would lie. The ubiquitous language Eric Evans described in Domain-Driven Design for large domains is the same discipline scaled down to one package, or one person’s system: the words in the code, the words in the console, and the words in your head are the same words, and you curate them. You do not inherit a vocabulary by subclassing someone else’s nouns. You write one, and you keep it small enough to defend.\nNaming is also the encapsulation. A prefix, a package namespace, and a stable verb are how a reader finds the operation. api_config_new, req_headers, format.foo — the module is the vocabulary, not a living object you have to open to discover what it can do. Shells have worked this way for decades. So do the R APIs that people actually love to call.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>The Law</span>"
+    ]
+  },
+  {
+    "objectID": "00-the-law.html#admit-only-valid-values",
+    "href": "00-the-law.html#admit-only-valid-values",
+    "title": "1  The Law",
+    "section": "1.2 Admit only valid values",
+    "text": "1.2 Admit only valid values\nA name that accepts anything is a comment.\nThe standard worth stealing is Alexis King’s, from Parse, don’t validate: construction is the check. Downstream code receives a value that already means the name, and it stops re-asking. In a language with a real type checker this is a theorem. In R it is a ritual you can house in an S3 constructor (new_*, validate_*, as_*) or in an S7 property and a class validator. The housing is a tradeoff, discussed in Chapter 12. The requirement is not. If the work is production work, invalid states are a bug at the boundary, not a vibe you check in the third method that happens to care.\nR will not make you do this. That is the whole difficulty, and it is also why the REPL is such a good place to discover which names deserve the ceremony. Discovery first. Then the parse.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>The Law</span>"
+    ]
+  },
+  {
+    "objectID": "00-the-law.html#show-it-well",
+    "href": "00-the-law.html#show-it-well",
+    "title": "1  The Law",
+    "section": "1.3 Show it well",
+    "text": "1.3 Show it well\nA type is not done when it can be constructed. It is done when a human can see what it means.\nR already treats the console as a user interface: print, format, str, and the semantic vocabulary in cli. PowerShell went further and made the view a separate, declarative contract (format data, sitting on the Monad manifesto’s rule that the pipe carries objects and the host decides how they look). The idea travels even though the XML does not. Skipping format is the same kind of unfinished as skipping the validator: the value exists, and nobody can read it.\nEffects need the same courtesy. A warning, a progress meter, a verbose trace, and a fatal error are different channels. Smashing them into cat() throws away the only protocol R has for routing them. That protocol is the condition system, and it is closer to Common Lisp than the tryCatch habit suggests. Chapter 7 goes into it.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>The Law</span>"
+    ]
+  },
+  {
+    "objectID": "00-the-law.html#extend-it-with-verbs",
+    "href": "00-the-law.html#extend-it-with-verbs",
+    "title": "1  The Law",
+    "section": "1.4 Extend it with verbs",
+    "text": "1.4 Extend it with verbs\nThe operation is the extension point.\nR’s generic-function tradition (S3, S4, S7) and the trait tradition in Rust share a posture: a new package can teach an old verb a new noun, or teach an old noun a new verb, without owning the type’s method table. Message-passing objects invert the posture. The type owns the verbs, and extension leans on subclassing or patching. Both are legitimate. They fit different problems. Data work, HTTP, compilers, and tool-using models are usually algebras — verbs closed over types — and they want the open verb. Widgets, documents with identity, and long-lived sessions sometimes want the closed object. R lets you build either, which is freedom and also how a codebase loses the plot.\nThe practical shape that keeps showing up:\n\n\n\n\n\nflowchart LR\n  data[Domain data] --&gt; names[Names]\n  names --&gt; types[Values that admit only those names]\n  types --&gt; verbs[Verbs and generics]\n  types --&gt; views[Print, format, cli]\n  verbs --&gt; workflows[Workflows as composition]\n  handles[Handles at the edge] --&gt; workflows\n  views --&gt; host[The host]\n\n\n\n\n\n\nValues in the middle. Handles at the rim, where identity is load-bearing: a socket, a token that refreshes, a cache, a conversation. Verbs everywhere a human or a pipe might call them. Views at the host.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>The Law</span>"
+    ]
+  },
+  {
+    "objectID": "00-the-law.html#two-sentences-one-book",
+    "href": "00-the-law.html#two-sentences-one-book",
+    "title": "1  The Law",
+    "section": "1.5 Two sentences, one book",
+    "text": "1.5 Two sentences, one book\nChambers compressed S and R into three principles, restated in S, R, and Data Science: everything that exists is an object, everything that happens is a function call, and interfaces to other languages are part of the language. The law above is what those principles feel like when you are the one shipping the package.\nThe metal chapters show why the value illusion holds, and where it is contractually false. The hybrid chapters show why the language grew this shape and why rigor feels like swimming upstream. The taste chapters are the law applied: containers, runtime types, presentation, dispatch.\nIf you remember one recommendation, remember the split. Facts are values. Capabilities are handles. Functions are the user interface. The console is a view, not a leftover.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>The Law</span>"
+    ]
+  },
+  {
+    "objectID": "01-header.html",
+    "href": "01-header.html",
+    "title": "2  The Header",
+    "section": "",
+    "text": "2.1 The type tag is five bits\ninspect is not a closure you can open in the editor. It is a C entry, do_inspect, living in src/main/inspect.c and reached through .Internal. The thing being printed is a node on the heap. The line you get back is the node’s header, translated into a dialect that rewards a little memorization.\nA typical line from a length-one integer inside a classed list:\nRead it left to right.\nThe manual’s version of this layout is R Internals, section 1.1. The header changed shape in R 3.5.0. Older blog posts that describe a 32-bit sxpinfo are describing a previous machine.\nSEXPTYPE occupies the first five bits, so there is room for 32 tags. The table in the manual is the one to trust. The ones a session like this actually meets:\nCodes 11 and 12 are a genuine piece of archaeology, not a rumor. The manual says they were used for internal factors and ordered factors, and were withdrawn. The numbers survive in serialized objects, so the gap cannot be casually reused. Factors today are integers with attributes. That story is in Chapter 6. OBJSXP used to be spelled S4SXP; the comment is still sitting in sexptype2char.\nThere is also a pseudo-type FUNSXP with code 99, used in a few internal tables to mean “some kind of function.” You will not see it in an inspect line. ANYSXP (18) is a placeholder for “any argument,” and there are no objects of that type.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>The Header</span>"
+    ]
+  },
+  {
+    "objectID": "01-header.html#the-type-tag-is-five-bits",
+    "href": "01-header.html#the-type-tag-is-five-bits",
+    "title": "2  The Header",
+    "section": "",
+    "text": "Code\nName\nAt R level\n\n\n\n\n0\nNILSXP\nNULL, and only NULL\n\n\n1\nSYMSXP\nnames\n\n\n2\nLISTSXP\npairlists: attributes, formals\n\n\n3\nCLOSXP\nordinary functions\n\n\n4\nENVSXP\nenvironments\n\n\n5\nPROMSXP\npromises\n\n\n6\nLANGSXP\ncalls\n\n\n7\nSPECIALSXP\nspecials: [, {, if, function\n\n\n8\nBUILTINSXP\nbuiltins: sum, +, c\n\n\n9\nCHARSXP\na single cached string, inside a character vector\n\n\n10\nLGLSXP\nlogical\n\n\n13\nINTSXP\ninteger\n\n\n14\nREALSXP\ndouble\n\n\n15\nCPLXSXP\ncomplex\n\n\n16\nSTRSXP\ncharacter\n\n\n17\nDOTSXP\n...\n\n\n19\nVECSXP\nlist\n\n\n21\nBCODESXP\nbyte code\n\n\n22\nEXTPTRSXP\nexternal pointer\n\n\n23\nWEAKREFSXP\nweak reference\n\n\n24\nRAWSXP\nraw\n\n\n25\nOBJSXP\nS4, and S7 instances",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>The Header</span>"
+    ]
+  },
+  {
+    "objectID": "01-header.html#g0c1-is-two-different-fields",
+    "href": "01-header.html#g0c1-is-two-different-fields",
+    "title": "2  The Header",
+    "section": "2.2 g0c1 is two different fields",
+    "text": "2.2 g0c1 is two different fields\nThe generation and the class are neighbors in the printout and unrelated in the header.\ngcgen is one bit. Inspect prints it as g0 or g1. It will never print g2. The collector itself is richer than the bit: memory.c keeps a nursery plus old generations (NUM_OLD_GENERATIONS is 2, and the comment next to it says the header bit is why you cannot have more than that). What you can actually see is the bit. In a live session, freshly allocated nodes tend to show g0. The nodes that have been around since startup — R_NilValue, locked symbols, cached CHARSXPs — show g1. Treat g1 as “this has survived, or was born old.” Treat a blog post that decodes g0c1 as “generation 0 of 3, size class 1 of a vague scale” as out of date.\ngccls is three bits, so eight allocation classes. The manual’s allocation-class section and the comment in memory.c agree:\n\n\n\n\n\n\n\nClass\nWhat lives there\n\n\n\n\n0\nNon-vector nodes, and the zero-size bucket\n\n\n1–5\nSmall vectors, with room for 8, 16, 32, 64, and 128 bytes\n\n\n6\nCustom allocators (allocVector3), not counted as ordinary R memory\n\n\n7\nLarge vectors, malloc’d individually\n\n\n\nThat is the whole of “random access versus cons” as a memory-manager question, and it is not stack versus heap. A pairlist node is class 0 because it is not a vector. A length-one integer is class 1 because four payload bytes fit in the 8-byte bucket. A length-one character vector is also class 1: one pointer. An environment’s hash table of a few dozen slots is class 7: twenty-nine pointers do not fit in 128 bytes. Empty character() and empty integer() landed in class 0 in the dumps, because a zero-length vector has nothing to put in a data page.\nSmall vectors come out of pages of about 2000 bytes. Large ones are their own allocations. Custom-allocator vectors can share memory in ways R’s accounting refuses to pretend to understand. ALTREP, later, is a further escape hatch: the node can exist before the data does.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>The Header</span>"
+    ]
+  },
+  {
+    "objectID": "01-header.html#the-flags-are-the-header-talking",
+    "href": "01-header.html#the-flags-are-the-header-talking",
+    "title": "2  The Header",
+    "section": "2.3 The flags are the header talking",
+    "text": "2.3 The flags are the header talking\nThe bracket is a selection, not a full register dump. The fields live in the 64-bit sxpinfo structure quoted in the manual:\nSEXPTYPE type      :  5;\nunsigned int scalar:  1;\nunsigned int obj   :  1;  /* class attribute? */\nunsigned int alt   :  1;  /* ALTREP? */\nunsigned int gp    : 16;\nunsigned int mark  :  1;\nunsigned int debug :  1;\nunsigned int trace :  1;\nunsigned int spare :  1;\nunsigned int gcgen :  1;\nunsigned int gccls :  3;\nunsigned int named : 16;  /* the reference count, these days */\nThe flags worth knowing by sight:\n\n\n\n\n\n\n\nFlag\nMeaning\n\n\n\n\nOBJ\nThe obj bit. This is what is.object() answers. A class attribute sets it.\n\n\nATT\nThe attribute pointer is not Nil. Attributes are a pairlist.\n\n\nMARK\nThe collector has marked the node in this collection.\n\n\nREF(n)\nThe reference count.\n\n\nLCK\nLocked. Common on symbols and on locked bindings or environments.\n\n\ngp=0x…\nSixteen general-purpose bits. Their meaning depends on the type.\n\n\nALT\nNot always spelled that way in the bracket, but the alt bit is how ALTREP is recognized.\n\n\nGL\nShows up on the global environment in inspect output.\n\n\n\ngp is where people get inventive, and it is worth resisting. On a CHARSXP the inspect line often already translates the bits you care about: [ASCII] [cached], sometimes with ATT because the character cache hangs information off the attribute pointer. The manual has a section on CHARSXP encodings and another on the cache. Symbol gp values (0x4000, 0x6000, 0x7000, 0x8000 in the dumps) are a different code book. They are decoded in the source, not in a stable user manual, and this book leaves them on the open list rather than inventing a table.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>The Header</span>"
+    ]
+  },
+  {
+    "objectID": "01-header.html#ref65535-is-a-saturated-count",
+    "href": "01-header.html#ref65535-is-a-saturated-count",
+    "title": "2  The Header",
+    "section": "2.4 REF(65535) is a saturated count",
+    "text": "2.4 REF(65535) is a saturated count\nNAMED_BITS is 16. Under the reference-counting build, REFCNTMAX is (1 &lt;&lt; 16) - 1, which is 65535. MARK_NOT_MUTABLE sets the count to that ceiling. Incrementing past the ceiling is a no-op, and decrementing a saturated count is also a no-op: the macros in Defn.h refuse to move a count that has hit the cap. A saturated node stays saturated. That is the technical meaning of immortal in these notes. The collector is not invited to free it, and the copy-on-modify logic is not invited to mutate it.\nR_NilValue is constructed that way on purpose. So are a lot of other process-lifetime nodes: many symbols, R_TrueValue, R_FalseValue, the canonical logical NA. A high count on a value you just created is a different phenomenon. It means something in the process is holding the node. The evaluator, the protection stack, .Last.value, a promise, an attribute, an environment binding, and an IDE’s object browser all count. The same binding can print REF(1) in a quiet console and a much larger number under RStudio, because RStudio is a holder. The count is a census of current pointers. It is not a property of the source literal.\nA fresh empty vector in those dumps printed an empty bracket, []. A node with a positive count printed REF(n). Read a missing REF as “no tracked holders worth printing,” and then go look at inspect.c before you build a theory on the absence. The field still exists.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>The Header</span>"
+    ]
+  },
+  {
+    "objectID": "01-header.html#where-inspect-sits",
+    "href": "01-header.html#where-inspect-sits",
+    "title": "2  The Header",
+    "section": "2.5 Where inspect sits",
+    "text": "2.5 Where inspect sits\nThe symbol inspect in the internal table is a SYMSXP whose internal pointer aims at that C routine. You do not hold the printer as a value in the way you hold the vector you asked it to describe. .Internal and .Primitive are the subject of chapter 2 of the same manual. Primitives are the fast path. Internals are the slightly more ordinary one. Neither is “an R function that happens to be written in C” in the way a .Call wrapper is. They are entries in the interpreter’s own table.\nOne more ambiguity the manual states cleanly, because the dumps make it easy to miss: an environment is both a frame and an enclosure. The frame is the bindings. The enclosure is the parent you walk when a name is missing. Hash tables, when present, are a VECSXP of pairlists, and the empty buckets are the Nil singleton, over and over, at one address. That picture is the whole of the next two chapters.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>The Header</span>"
+    ]
+  },
+  {
+    "objectID": "02-empties.html",
+    "href": "02-empties.html",
+    "title": "3  Three Empties",
+    "section": "",
+    "text": "3.1 Why Nil gets to be the only one\nThe first good hypothesis in the notebook was slightly too wide, and the next calls retired the extra width. That is the experiment working.\nThe hypothesis, paraphrased from the comments: any genuinely empty thing is the same immortal NILSXP cell. NULL, c(), and pairlist() confirmed it, including under the strictest identical() switches, and including extptr.as.ref = TRUE. Same address. Same type code 0. REF pinned at the ceiling.\nThen list() and alist() printed a different address, type 19, VECSXP, length 0, empty flag bracket. Then integer(), character(), double(), logical(), complex(), and raw() each printed a zero-length vector of their own type. The hypothesis that survived is sharper than the one that was written down first.\nUntyped pairlist emptiness collapses. Every other zero is a real node of its own type.\nR Internals says there is only one object of type NILSXP, and it has no data. The constructor in memory.c is worth reading slowly:\nIt is a cons cell that points at itself in every direction, allocated before any other cons cell, with the reference count pinned and mutation forbidden. The write barrier refuses assignments into its fields. Empty hash buckets point at it. The empty formal list points at it. The end of every pairlist points at it. “No binding here,” “no attribute,” “no rest of this chain,” and “the user said NULL” are the same node because the Lisp tradition this evaluator comes from treats the empty list and nil as one object, and because having two of them would make every == R_NilValue pointer check a lie.\nThat is the sense in which Nil is special. Special does not mean “has a richer identity than a typed empty.” It means the runtime has exactly one, forever, and a large amount of C code compares pointers against it. A typed empty is special in a different way: it is allowed to be nothing of a particular kind. Programs should imitate the second kind. A zero that still has a type is a value you can pass through lapply, attach a name to, and refuse to confuse with “the argument was missing.”",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Three Empties</span>"
+    ]
+  },
+  {
+    "objectID": "02-empties.html#why-nil-gets-to-be-the-only-one",
+    "href": "02-empties.html#why-nil-gets-to-be-the-only-one",
+    "title": "3  Three Empties",
+    "section": "",
+    "text": "/* R_NilValue */\n/* THIS MUST BE THE FIRST CONS CELL ALLOCATED */\n/* OR ARMAGEDDON HAPPENS. */\nGET_FREE_NODE(R_NilValue);\nSET_REFCNT(R_NilValue, REFCNTMAX);\nSET_TYPEOF(R_NilValue, NILSXP);\nCAR0(R_NilValue) = R_NilValue;\nCDR(R_NilValue) = R_NilValue;\nTAG(R_NilValue) = R_NilValue;\nATTRIB(R_NilValue) = R_NilValue;\nMARK_NOT_MUTABLE(R_NilValue);",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Three Empties</span>"
+    ]
+  },
+  {
+    "objectID": "02-empties.html#why-list-refuses-to-collapse",
+    "href": "02-empties.html#why-list-refuses-to-collapse",
+    "title": "3  Three Empties",
+    "section": "3.2 Why list() refuses to collapse",
+    "text": "3.2 Why list() refuses to collapse\nThe tempting explanation is dispatch. .S3PrimitiveGenerics and .internalGenerics are right there in the notebook, and they look like a reason. They are a reason that some operations on vectors are wired into the primitive table for speed. They are not why the empty list has its own node.\nlist() is a R’s user-facing list. One header plus a contiguous array of SEXP pointers, type VECSXP.generic vector. The manual’s description of VECSXP is a header, a length, a true length, and a block of SEXP pointers. Length zero is a legitimate block. It has to be, because the zero of the user-facing heterogeneous container has to remain that container:\n\ntypeof(list()) is \"list\", and length(list()) is 0\nis.null(list()) is FALSE, which a huge amount of real code depends on\nyou can set names on it, grow it with [[&lt;-, and hand it to lapply\nan empty list with no class is still not NULL, so the OBJ bit and the class attribute stay out of the explanation\n\nPairlists follow the other rule because they are cons chains. The empty chain is nil. pairlist() with no arguments returns R_NilValue. R kept that rule for the substrate — formals, attributes, the tail of a call — and grew a different empty for analysts.\nalist() is the subtle one. An alist is a list that can hold missing arguments; it is still a generic vector, not a pairlist. Empty, it is another zero-length VECSXP, at its own address. The name “alist” is historical. The representation is the vector world’s.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Three Empties</span>"
+    ]
+  },
+  {
+    "objectID": "02-empties.html#typed-emptiness-is-a-value",
+    "href": "02-empties.html#typed-emptiness-is-a-value",
+    "title": "3  Three Empties",
+    "section": "3.3 Typed emptiness is a value",
+    "text": "3.3 Typed emptiness is a value\ninteger() is not “nothing.” It is a length-zero integer vector. Sum it, recycle it, bind it as a column, give it a class. character() is a length-zero STRSXP, which means a vector of CHARSXP pointers with no pointers in it. The R-level word is \"character\". The C-level word is STRSXP. The single string inside a character vector is the thing called CHARSXP, and you almost never hold one of those at R level. The notebook guessed STRSEXP. Close, and the distinction matters the moment you read a header.\nnumeric() is double() by another door. typeof(numeric()) is \"double\". There is no NUMSXP.\nThis is also why c() with no arguments is Nil rather than “an empty atomic vector of unknown type.” c() is the concatenator. Given nothing to concatenate and no type to inherit, it returns NULL. Given integers, it returns an integer vector. The empty call is the degenerate case of a function, not the zero of a type. integer() is the zero of a type. They answer different questions, and the dumps are the proof that R refuses to pretend they are the same question.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Three Empties</span>"
+    ]
+  },
+  {
+    "objectID": "02-empties.html#what-people-mean-by-no-scalars",
+    "href": "02-empties.html#what-people-mean-by-no-scalars",
+    "title": "3  Three Empties",
+    "section": "3.4 What people mean by “no scalars”",
+    "text": "3.4 What people mean by “no scalars”\nS took a shortcut that still defines the language. Chambers describes it in the 2020 R Journal piece: there were not enough hands to build a language with scalars and also vectors, and the Fortran libraries underneath already thought in arrays. So the low-level scalar work stayed on the other side of the interface, and R inherited a world in which 1L is an integer vector of length one. The scalar bit in the header is an optimization for that common case, not a new type.\nTyped emptiness is the dual of that decision. If everything is a vector, the empty vector has to exist, per type, or “zero of these” collapses into “absence” and absence already has a resident. Nil is absence. integer() is a count of zero. Keeping them apart is one of the few places R is stricter than its reputation.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Three Empties</span>"
+    ]
+  },
+  {
+    "objectID": "03-cons.html",
+    "href": "03-cons.html",
+    "title": "4  Cons and Vectors",
+    "section": "",
+    "text": "4.1 A cons cell is three pointers\n“Random access” sounds like a hardware claim. In this language it is an indexing claim. Both structures live on the heap, in the collector’s node pools. The C stack and the protection stack are real, and they are not where your list is stored.\nLisp’s cons is short for construct. A A heap node with a head, a tail, and an optional name. Pairlists and calls are chains of them.cons cell is one node:\nA pairlist of length three is three heap nodes linked by CDR, and the last CDR is R_NilValue. Reaching element i walks i links. That cost is linear. Attributes are stored this way. Formals are stored this way. The manual is explicit that a LANGSXP, the type of a call, is a pairlist whose CAR is the function and whose CDR is the arguments, tags included when the caller named them.\nYou can see it in any classed object’s attribute dump. names and class are tags on a LISTSXP. The values hanging off those tags are ordinary vectors, often a STRSXP of length one whose single CHARSXP is in the string cache and has a ridiculous reference count because the cache is doing its job. The structure around them is still a linked list. R did not modernize that path. It stopped asking analysts to live on it.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Cons and Vectors</span>"
+    ]
+  },
+  {
+    "objectID": "03-cons.html#a-cons-cell-is-three-pointers",
+    "href": "03-cons.html#a-cons-cell-is-three-pointers",
+    "title": "4  Cons and Vectors",
+    "section": "",
+    "text": "Field\nRole in R\n\n\n\n\nCAR\nthe head, the value\n\n\nCDR\nthe rest of the chain\n\n\nTAG\nan optional name, a SYMSXP, or Nil",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Cons and Vectors</span>"
+    ]
+  },
+  {
+    "objectID": "03-cons.html#a-generic-vector-is-an-array-of-pointers",
+    "href": "03-cons.html#a-generic-vector-is-an-array-of-pointers",
+    "title": "4  Cons and Vectors",
+    "section": "4.2 A generic vector is an array of pointers",
+    "text": "4.2 A generic vector is an array of pointers\nA VECSXP is one header plus a contiguous block of SEXP pointers. Element i is data[i]. That is constant time. That is all “random access” means here. It does not mean the pairlist is on the stack, and it does not mean the vector is a C array of unboxed values. The pointers in a list refer to other nodes, which have their own headers, their own counts, their own possibility of being shared.\nAtomic vectors are the unboxed case: an INTSXP really is a block of C ints, a REALSXP a block of doubles. A list is a block of pointers to values. Sharing a list and sharing an element of the list are different facts. That difference is why changing one column of a data frame does not have to copy the other columns. The vector of column pointers is the thing that gets duplicated. The untouched columns keep their addresses. Advanced R’s chapter on names and values is the patient version of this, with pictures.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Cons and Vectors</span>"
+    ]
+  },
+  {
+    "objectID": "03-cons.html#demoted-not-deleted",
+    "href": "03-cons.html#demoted-not-deleted",
+    "title": "4  Cons and Vectors",
+    "section": "4.3 Demoted, not deleted",
+    "text": "4.3 Demoted, not deleted\nEarly R was closer to Scheme. Implementing a GNU S pushed the pairlist inward and the vector outward. Chambers’ history in the R Journal article is the long version of that turn: an interface to Fortran arrays, a user language of expressions that return objects, and an implementation that grew a second, vector-shaped world on top of a cons-shaped evaluator.\nWhat remains of the cons world at the surface:\n\npairlist() and as.pairlist(), which most code never needs\nthe occasional pairlist that leaks out of a primitive and gets coerced to a list on the way past\nformals(), which returns a pairlist because that is what a closure’s formals are\nattributes, which you manipulate with attr and attributes so you never have to walk the chain yourself\nevery call you quote, which is a LANGSXP and therefore a cons chain you are encouraged to treat as data\n\n“R did not abandon cons; it demoted them to implementation substrate” is this split, said in one line. Analysts get vectors and generic vectors. The evaluator keeps cons cells for the sentences of the language and for the metadata hung on values. When a pairlist crosses into user code it is often promoted, because the user-facing sequence type won.\nThe terminology is scar tissue. In Lisp a list is a chain of conses. In R a list is a VECSXP, and the chain of conses is called a pairlist so that the two can coexist in one manual. If that naming bothers you, it should. It is the sound of two languages that refused to give up their word for the same idea.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Cons and Vectors</span>"
+    ]
+  },
+  {
+    "objectID": "03-cons.html#what-you-can-see-without-a-microscope",
+    "href": "03-cons.html#what-you-can-see-without-a-microscope",
+    "title": "4  Cons and Vectors",
+    "section": "4.4 What you can see without a microscope",
+    "text": "4.4 What you can see without a microscope\ntypeof(quote(f(x = 1)))   # \"language\"  -&gt; LANGSXP\ntypeof(formals(mean))     # often \"pairlist\"\ntypeof(list(a = 1))       # \"list\"      -&gt; VECSXP\ntypeof(attributes(factor(1)))  # \"pairlist\" or NULL, and the class attribute is real\nlobstr::ast() prints a call as a tree because the call is a tree of cons cells. lobstr::ref() on a list shows you the pointer array and then the children. The two pictures are the two worlds. Once you can see which world a given object is in, a surprising number of performance folktales become ordinary data-structure facts: walking a pairlist in a tight loop is a linked-list walk, growing a vector without the true-length trick is copying an array, and [[ on a list is an index, not a search.\nThe protection stack is the other “stack” worth a sentence, so it stops haunting the word. R’s C API requires callers to protect nodes they want to survive a garbage collection. That protection is a pointer stack in the runtime, described around the memory-allocator sections of the internals manual. It is bookkeeping for the collector. It is not the place pairlists live, and it is not an invitation to reason about user objects as stack-allocated values. User-visible SEXPs are heap nodes. Full stop.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Cons and Vectors</span>"
+    ]
+  },
+  {
+    "objectID": "04-value-illusion.html",
+    "href": "04-value-illusion.html",
+    "title": "5  The Value Illusion",
+    "section": "",
+    "text": "5.1 From NAMED to a real count\nCopy-on-modify feels like a magic trick because a 5 GB data frame can lose one cell and the machine does not blink. The feeling is accurate. The explanation is ordinary, once you are willing to look at three mechanisms that were built decades apart and happen to serve the same illusion.\nThe public rule: ordinary objects behave as values. Binding a new name does not copy. Modifying through one name does not change the other name. The private rule: nodes are shared until a write, and a write copies only when the reference count says someone else still cares.\nThat is The rule that a shared ordinary vector is duplicated before a write, so other names keep the old value.copy-on-modify. It is not a copy on every touch, and it is not mutation of a shared value. It is a copy at the moment a write would otherwise be visible through a second name.\nBefore R 4.0 the bit that answered “may I mutate this?” was NAMED, and it was a terrible counter. It went up to 2 and almost never came back down. A value that had ever been shared stayed “maybe shared” forever, so later writes copied even when every other holder had already gone away. Luke Tierney’s notes on reference counting are the design argument, written while the new scheme was still something you compiled in with SWITCH_TO_REFCNT. They are a historical document with a living conclusion. Read them as the motivation, then look at a modern dump: REF(n) is the count, and the macros in Defn.h increment and decrement it at the same assignments that maintain the generational write barrier.\nThe write barrier is the part worth understanding, because it explains why the bookkeeping is affordable. A generational collector has to notice when an old node grows a pointer to a young one, or the young one gets collected while the old one still needs it. Those assignment sites already existed. Reference counting hitchhiked on them: store a new pointer, increment the new target, decrement the old one. The value illusion is what that bookkeeping buys the user.\nA few holders deliberately do not count. Tierney lists .Last.value, the left-hand side of a complex assignment, and some internal argument lists built with CONS_NR so that merely calling a function does not pin the arguments into permanent sharing. This is why a count is not a moral fact about your code. It is a census of whoever the runtime and the IDE have chosen to track.\nThe practical consequences, all visible from user level and spelled out in Advanced R:\nEnvironments do not play this game. Assigning into an environment mutates the frame. The reference count still tells you how many names point at that environment. It does not trigger a duplicate-on-write of the bindings. An environment with REF(11) is a popular handle, not a value that is about to be copied for your safety. The global environment is saturated and locked because it is part of the process.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>The Value Illusion</span>"
+    ]
+  },
+  {
+    "objectID": "04-value-illusion.html#from-named-to-a-real-count",
+    "href": "04-value-illusion.html#from-named-to-a-real-count",
+    "title": "5  The Value Illusion",
+    "section": "",
+    "text": "x &lt;- y shares. tracemem or lobstr::obj_addr will agree.\ny[1] &lt;- 0 on a shared atomic vector allocates a new vector for y.\nReplacing one column of a data frame duplicates the list of columns and the one column you replaced. The other columns keep their addresses. That is the 5 GB frame that “copies” without copying 5 GB.\nA count of 1 means the runtime believes you are the only holder, and a primitive is allowed to modify the node in place. This is a promise about the implementation, not a license to depend on in-place behavior in package code unless you are writing C and have checked the count yourself.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>The Value Illusion</span>"
+    ]
+  },
+  {
+    "objectID": "04-value-illusion.html#altrep-is-the-same-idea-one-floor-down",
+    "href": "04-value-illusion.html#altrep-is-the-same-idea-one-floor-down",
+    "title": "5  The Value Illusion",
+    "section": "5.2 ALTREP is the same idea, one floor down",
+    "text": "5.2 ALTREP is the same idea, one floor down\nReference counting avoids copies of data you already materialized. A framework for giving an ordinary SEXPTYPE a different payload, such as a compact sequence or a deferred string.ALTREP avoids materializing the data.\nThe design note by Tierney, Becker, and Kalibera, ALTREP: Alternative Representations for R Objects, is the primary source, with the 2017 DSC slides and the 2018 tech note listed from developer.r-project.org. The goal is representational freedom under a stable SEXPTYPE. To existing C code an ALTREP integer still looks like an INTSXP. The payload can be something else:\n\na compact arithmetic sequence, so 1:1e9 does not allocate a billion integers\na deferred conversion of strings\na memory-mapped or distributed vector\nmetadata such as “sorted” or “no NAs,” so a later question can be answered without a scan\nin the original sketch, even an alternative shape for environments\n\nThe abstract classes (ALTREP, ALTVEC, ALTINTEGER, ALTREAL, ALTSTRING, …) are fixed to the existing type tags. There is no user hierarchy of representations. A method can return a C NULL to mean “fall back to the ordinary protocol,” which is why the feature could land in a thirty-year-old interpreter. Dataptr_or_null is the polite question: give me the data if it is already here, and do not allocate if it is not. Extract_subset is how a slice of a compact sequence stays compact.\nThis is the same family of idea as a buffer protocol or a view: the type tag is the contract, the bytes are a choice. It is also why “I assigned 1:n and the memory graph did not move” is not evidence that R is reference-semantic. It is evidence that the sequence was never a pile of boxes to begin with. Force the payload — inspect is often enough, or any operation that needs a real data pointer — and the boxes appear.\nThe alt bit in the header is the flag. Combined with the allocation class, it tells you whether you are looking at a node that owns bytes or a node that knows how to produce them.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>The Value Illusion</span>"
+    ]
+  },
+  {
+    "objectID": "04-value-illusion.html#promises-are-the-calling-convention",
+    "href": "04-value-illusion.html#promises-are-the-calling-convention",
+    "title": "5  The Value Illusion",
+    "section": "5.3 Promises are the calling convention",
+    "text": "5.3 Promises are the calling convention\nArguments are not passed as values. They are passed as A delayed argument. An expression plus an environment, forced at most once, then remembered.promises: a PROMSXP holding the expression, the environment in which to evaluate it, and eventually the value. The manual states the lifecycle in one sentence. Once the promise has been forced, the environment pointer is set to NULL and the value is remembered. Force-once. After that, the argument is just a value with a history.\nThat is why the public phrase “pass by value” is a description of the illusion, not of the calling convention. The convention is: pass by promise, share until a write, duplicate if the count says the write would leak. Laziness here is not Haskell’s laziness. Haskell delays evaluation to keep expressions referentially transparent and to permit infinite structures. R delays evaluation so that a plot can use the expression you typed as a label, so that a default argument can mention another argument, and so that non-standard evaluation has something to capture. The cost is evaluation-order surprises. The benefit is the part of the REPL that feels like talking.\nSpecials and builtins are the exception that proves the rule, and they get their own section in Chapter 6. A special does not even build the promises. It receives the arguments raw.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>The Value Illusion</span>"
+    ]
+  },
+  {
+    "objectID": "04-value-illusion.html#is-mutation-with-the-receiver-left-blank",
+    "href": "04-value-illusion.html#is-mutation-with-the-receiver-left-blank",
+    "title": "5  The Value Illusion",
+    "section": "5.4 <<- is mutation with the receiver left blank",
+    "text": "5.4 &lt;&lt;- is mutation with the receiver left blank\nThe discomfort with &lt;&lt;-, set next to the comfort with environments, is not hypocrisy once you separate mutation from finding the thing you mutate.\n&lt;&lt;- walks the enclosure chain, the same walk a free variable uses on the way out, and assigns into the first binding it finds, or into the global environment if it finds none. The target depends on who enclosed the function. Move the function, wrap it, local() it, put it in a package namespace, and the walk can land somewhere else. The mutation is real. The receiver is implicit. That is a fragile API even when the memory model is doing exactly what it was asked.\nAn explicit environment, or an R6 object, or an S7 object whose parent is class_environment, names the receiver. Aliases see the same mutation because identity is the point. You can pass the handle, fake it in a test, and refuse to let a helper go fishing in its parents. Both techniques modify shared state. One of them puts the shared state in the signature.\nThe social rule “never use &lt;&lt;-” is a documentation rule that got promoted to a moral one. The memory-model rule underneath it is better: do not mutate through a search. If identity matters, hold the object. If identity does not matter, return a value and let copy-on-modify do its job.\nHaskell’s ST monad is the typed version of the same instinct. The paper is Launchbury and Peyton Jones, “Lazy Functional State Threads” (POPL 1994): you may mutate inside a scope, and runST will not let the mutable references escape, so the outside world still sees a pure function. R can imitate the pattern — scratch environment in, list or S7 value out — and has no type system that can enforce the boundary. The fence is a convention you write down. Package code that returns the handle by accident has broken the fence, and nothing in the language will clear its throat.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>The Value Illusion</span>"
+    ]
+  },
+  {
+    "objectID": "04-value-illusion.html#what-the-illusion-is-for",
+    "href": "04-value-illusion.html#what-the-illusion-is-for",
+    "title": "5  The Value Illusion",
+    "section": "5.5 What the illusion is for",
+    "text": "5.5 What the illusion is for\nThe illusion is for reasoning. A function that takes a data frame and returns a data frame can be read as a transformation of a value, even though the columns you did not touch are shared and the sequence you did not expand is still compact. Tests can compare values. Pipes can be reread. Names do not secretly observe each other’s later assignments.\nThe illusion is a lie for exactly the objects where observation is the feature: environments, external pointers, weak references, and reference classes built on top of them. Chambers’ principles say everything is an object and everything that happens is a function call. They do not say every object has value semantics. The dumps are where you learn which objects opted out. Designing as if they all opted in, or as if none of them did, is how packages get either haunted state or tragic performance.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>The Value Illusion</span>"
+    ]
+  },
+  {
+    "objectID": "05-in-context.html",
+    "href": "05-in-context.html",
+    "title": "6  In Context",
+    "section": "",
+    "text": "6.1 Builtins and specials\nA lot of SEXP types feel mythical until the right expression manufactures one. Absence from a typical script is not absence from the type system. The notebook kept bumping into this, and it is worth walking type by type with the context that makes each one show up.\ntypeof(sum) is \"builtin\". typeof([) is \"special\". typeof({) is \"special\". typeof(function() NULL) is \"closure\". The nodes are BUILTINSXP, SPECIALSXP, and CLOSXP. They are easy to miss because printing them shows .Primitive(\"sum\") or the source of the closure, and because you rarely inspect the function rather than the value it returned.\nThe semantic difference is the old Lisp split between an applicative function and a form that receives code. A builtin evaluates its arguments, then receives the values. A special does not. [, if, {, &&, ||, function, quote, and &lt;- have to be specials, because evaluating everything first would destroy the construct. `&&` must not touch the right-hand side when the left-hand side is false. function must not evaluate the body at definition time. The internals manual calls these out as special primitives.\nClosures are the third kind: formals (a pairlist), body (usually a LANGSXP), and enclosing environment. That triple is what inspect prints under FORMALS, BODY, and CLOENV. An S7 class is one of these. The notebook’s new_class() dump is a CLOSXP with a class attribute of c(\"S7_class\", \"S7_object\") and a pile of metadata — name, parent, properties, validator, constructor — hanging off the attribute pairlist. The constructor you call is a function. The class object is that function, plus attributes. That is a very R solution: reuse the closure node you already have, and hang the dictionary off the side.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>In Context</span>"
+    ]
+  },
+  {
+    "objectID": "05-in-context.html#objects-factors-and-the-integer64-lie",
+    "href": "05-in-context.html#objects-factors-and-the-integer64-lie",
+    "title": "6  In Context",
+    "section": "6.2 Objects, factors, and the integer64 lie",
+    "text": "6.2 Objects, factors, and the integer64 lie\nTwo different words got called “object,” and the confusion is reasonable.\nis.object(x) answers the OBJ bit, which the header comment defines as “does this have a class attribute?” A factor is an INTSXP with a levels attribute and class = \"factor\". The bit is set. typeof stays \"integer\". OBJSXP is a different question: type code 25, the node shape used for S4 objects and for S7 instances, which do not consist solely of a simple vector or function. The manual says so directly. The notebook’s S7 instance, after @p &lt;- \"aaa\", is type 25. The factor never was.\nFactors feel “more low-level” because base R and the C API know them intimately: modeling code, tabulation, printing, levels&lt;- as a primitive generic. The representation pattern is still the S3 pattern. Historically they had their own SEXP types, codes 11 and 12, and those were withdrawn. The withdrawal is the tell. R decided that “integer plus attributes” was enough type system for factors, and then lived with the consequences.\nbit64::integer64() is the same pattern with the costume showing. typeof is \"double\". Inspect shows a REALSXP with OBJ and ATT, and a class string \"integer64\". A double is 64 bits wide, so the package stores a 64-bit integer in the payload a double would have used and lies, politely, at the class layer. S3 as a reinterpretation of storage is half of R’s power. You can ship a new semantic type without a new SEXPTYPE, which is why the set of SEXPTYPEs can stay frozen. It is also half of R’s pain. Every function that forgets to be generic will treat the payload as what it physically is. mean of an integer64 without a method is a nonsense double. The class is law. The SEXPTYPE is physics. Code that only knows physics will enforce physics.\nS7::class_any is a useful decoy. Inspect shows a length-zero VECSXP with class \"S7_any\". It is not an S7 class constructor, and it is not an OBJSXP. It is a base-type object used as a property constraint meaning “anything.” The slot exists so that a property can name its admitted type. Leaving it at class_any is a choice, and Chapter 12 argues it is usually the wrong one.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>In Context</span>"
+    ]
+  },
+  {
+    "objectID": "05-in-context.html#promises-dots-and-byte-code",
+    "href": "05-in-context.html#promises-dots-and-byte-code",
+    "title": "6  In Context",
+    "section": "6.3 Promises, dots, and byte code",
+    "text": "6.3 Promises, dots, and byte code\nYou meet a PROMSXP by forcing the issue: delayedAssign, or inspecting a formal while a call is live and the argument has not been touched. Dots are DOTSXP, a pairlist of promises bound to .... Byte code is BCODESXP. The compiler produces it, package loading produces it, and in the S7 dumps the parent class S7_object already has a byte-coded body because the package was built with the compiler on. You did not ask for byte code. You asked for S7, and the namespace handed you a compiled closure.\nNone of these require a debugger if you know which expression allocates them. They do require you to stop expecting inspect(1L) to introduce you to the whole zoo. The zoo comes to you when evaluation, compilation, or a package constructor needs it.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>In Context</span>"
+    ]
+  },
+  {
+    "objectID": "05-in-context.html#external-pointers-and-weak-references",
+    "href": "05-in-context.html#external-pointers-and-weak-references",
+    "title": "6  In Context",
+    "section": "6.4 External pointers and weak references",
+    "text": "6.4 External pointers and weak references\nThese two get conflated because both smell like “systems programming,” and they answer different questions.\n\n\n\n\n\n\n\n\n\nExternal pointer\nWeak reference\n\n\n\n\nType\nEXTPTRSXP\nWEAKREFSXP\n\n\nManual’s picture\na pointer, a protected R object, and a tag\na length-4 vector: key, value, finalizer, next\n\n\nJob\nname a foreign resource\nremember a value only while the key is alive\n\n\nDeath\na finalizer can run when the pointer is collected\nwhen the key dies, the weak reference clears and does not keep the key alive\n\n\n\nAn external pointer is how an R object owns a GDAL dataset, a database connection, a C++ instance. The R object is the handle you can name, protect, and finalize. The bytes live in someone else’s allocator. reg.finalizer is the base-R hook for “run this when the node goes.” That is the interface principle from Chambers, made concrete: talking to other languages includes talking about their lifetimes.\nA weak reference is a cache that does not create a leak. The key is an environment or an external pointer (or NULL). The value is what you wanted to remember. The collector is allowed to forget the value when the key is otherwise unreachable. Memoisation tables and package registries use this so that “I have seen this object” does not become “I will keep this object forever.”\nThe user’s complaint is correct and worth keeping. The C type being real is not the same thing as a base constructor you can teach to a beginner. rlang::new_weakref is a language-level wrapper. typeof on its result is \"weakref\", so once you hold one, R will admit the type exists. Building one by hand is a C or package job. reg.finalizer is the piece base actually exports for the neighboring problem. A lot of “tidyverse primitives” have this shape: the runtime grew the capability, and a package grew the API. ALTREP classes, a comfortable restart surface, and weak maps all sit in that gap. Internals are not the standard library. Pretending they are is how people tell you the feature “already exists” when what exists is a struct.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>In Context</span>"
+    ]
+  },
+  {
+    "objectID": "05-in-context.html#s7-values-and-r6-handles-at-the-level-of-nodes",
+    "href": "05-in-context.html#s7-values-and-r6-handles-at-the-level-of-nodes",
+    "title": "6  In Context",
+    "section": "6.5 S7 values and R6 handles, at the level of nodes",
+    "text": "6.5 S7 values and R6 handles, at the level of nodes\nThis is the identity fork, photographed.\nAn S7 class object is a CLOSXP. Calling it allocates an instance. In the notebook the instance is an OBJSXP whose attributes carry the class string and a pointer back at the class. Properties live in that structure. @p &lt;- went through a replacement function and the address changed. Same physics as df$x &lt;- on a data frame: value semantics, copy-on-modify, a new node for the modified object. The class object itself is shared. Instances point back at it. Dispatch is generic functions, not messages stored in the instance.\nAn R6 generator is an ENVSXP. The dump is a guided tour of a mutable dictionary: a hash table, bindings for classname and public_fields, closures whose enclosing environment is the generator itself, a clone method whose body builds new environments and remaps closures into them, lockEnvironment, reg.finalizer wired to $finalize, and the famous .__enclos_env__ chain. Methods are closures closed over the object environment. That is the Scheme model of an object, shipped as a package. $foo &lt;- does not change the address. Cloning is an explicit walk. The giant paste in the notebook is the clone machinery’s source, seen from the inside, and it is allowed to be ugly. It is doing something the value world gets for free.\nS7’s experimental class_environment is the admission that the class machinery and the identity regime are separable. You can ask for S7’s properties and validators on environment physics. The documentation marks it dangerous because it is dangerous: you have opted out of the value illusion while keeping a syntax that looks like the illusion. Use it when you mean a handle. Do not use it because an environment seemed like a convenient list.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>In Context</span>"
+    ]
+  },
+  {
+    "objectID": "05-in-context.html#what-the-physics-does-not-decide",
+    "href": "05-in-context.html#what-the-physics-does-not-decide",
+    "title": "6  In Context",
+    "section": "6.6 What the physics does not decide",
+    "text": "6.6 What the physics does not decide\nKnowing that an instance is an OBJSXP does not tell you whether color should be a class. It tells you that if you make it an S7 value, property replacement will behave like data-frame replacement, and if you make it an R6 object, property replacement will behave like environment assignment. The physics constrains the promises you can keep. The vocabulary is still your job. That is the hinge into the second half of the book.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>In Context</span>"
+    ]
+  },
+  {
+    "objectID": "06-signals.html",
+    "href": "06-signals.html",
+    "title": "7  Signals",
+    "section": "",
+    "text": "7.1 Three moves, not one\nThe comment in the notebook is the right complaint, and it is more precise than it felt at the time.\nR’s conditions are S3 objects sitting on a signaling mechanism that can run a handler while the stack is still alive, muffle a warning, or invoke a restart. The culture around them is an exception culture: stop, tryCatch, unwind, maybe wrap the message in a new class and stop again. Both facilities are real. One of them is taught. The other is how robust software actually wants to talk.\nKent Pitman’s retrospective on condition handling separates what most languages glue together. The Common Lisp HyperSpec states the mechanism in chapter 9. Compressed:\ntryCatch does a narrower thing. It establishes an exiting handler. The stack unwinds to the catch, and then your function runs. Whatever the callee might have done to fix the problem and continue is gone. That is the right tool when the policy really is “abandon this attempt.” It is the wrong default when the policy is “hear about this and decide.”\nwithCallingHandlers establishes a calling handler. It runs on the live stack. withRestarts and invokeRestart are the resume mechanism, and they are base R, not a package invention. signalCondition is the low-level signal. Warnings and messages are conditions that happen to have default handlers installed by the runtime: print something, and in the warning case continue. tryCatch on a warning is you replacing that policy with an unwind. Sometimes you want that. Often you wanted to muffle, collect, or re-signal.\nAdvanced R’s conditions chapter is the practical map, including the class hierarchy (condition → error / warning / message, and your subclasses under those). rlang::try_fetch() is the current “handler that can return a value” spelling, and the cnd_ constructors are how you build the objects without hand-rolled structure() calls. None of this is obscure because it is weak. It is obscure because the first page of search results says tryCatch.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Signals</span>"
+    ]
+  },
+  {
+    "objectID": "06-signals.html#three-moves-not-one",
+    "href": "06-signals.html#three-moves-not-one",
+    "title": "7  Signals",
+    "section": "",
+    "text": "Signal. Name a situation by allocating an object, not by throwing a string.\nHandle. Decide policy while the stack that signaled is still there. A handler can repair, muffle, log, or decline.\nRestart. Offer a named way to resume. invokeRestart transfers control to a restart the signaler, or someone above the signaler, established for this purpose.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Signals</span>"
+    ]
+  },
+  {
+    "objectID": "06-signals.html#catching-a-500-to-throw-a-500",
+    "href": "06-signals.html#catching-a-500-to-throw-a-500",
+    "title": "7  Signals",
+    "section": "7.2 Catching a 500 to throw a 500",
+    "text": "7.2 Catching a 500 to throw a 500\nThe failure mode is a layering mistake.\nAn HTTP library that sees status 500 has learned a fact. The fact wants a class: the status, the URL, the body, the request id. That class is the signal, or it is the value you return if you have chosen errors-as-values for this boundary. What the application does about it is a different function, living in a different place.\n\n\n\n\n\n\n\nLayer\nJob\n\n\n\n\nLibrary boundary\nSignal a classed condition, or return a result value, with enough structure to branch on\n\n\nPolicy boundary\nwithCallingHandlers or try_fetch map that class onto a recovery, a richer condition, or a logged warning\n\n\nApplication boundary\nAbort, retry, prompt, or degrade, by invoking a restart or by returning\n\n\n\nCatching an httr2 error solely to stop() with a new message throws away the class the library already gave you and forces every caller to parse text. Re-signaling a richer condition, with the original as the parent, is a different act: you are translating a transport fact into a domain fact. The class is the point of the translation. The string is for the human at the host.\nParent classes matter here. A handler for http_error can sit above a handler for http_error_500. A handler for error is the wide net. S3 dispatch on the condition’s class is the “native method dispatch” the comment was reaching for. It works. It works only if someone signals a class worth dispatching on, and only if the handler is registered where the stack still has the context to use it.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Signals</span>"
+    ]
+  },
+  {
+    "objectID": "06-signals.html#errors-as-values-are-a-neighboring-door",
+    "href": "06-signals.html#errors-as-values-are-a-neighboring-door",
+    "title": "7  Signals",
+    "section": "7.3 Errors as values are a neighboring door",
+    "text": "7.3 Errors as values are a neighboring door\nRust’s Result, purrr’s safely, and a validator that returns a failure value instead of signaling are a different design with the same taste. The failure is data. The caller branches on it with ordinary control flow. There is no stack discipline to get right, and there is also no way for a caller three frames up to establish a restart the callee can invoke. You chose an explicit return channel over a signal channel.\nR can do both, which means a package has to pick. One effect story per boundary. Fatal stop for programmer errors and invariant failures. Classed signals for situations a caller might plausibly handle. Result values when the failure is an ordinary outcome of the domain (“this address did not geocode”) and you do not want it traveling by a side channel. Mixing all three in one function, plus a cat() of the URL for good measure, is how an API feels schizophrenic.\nS7 validators that return character vectors of problems are already in the errors-as-values family. They are not a condition system. They are a parse step. Use them at construction. Use conditions for what happens later, when a well-built value meets a world that can still say no.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Signals</span>"
+    ]
+  },
+  {
+    "objectID": "06-signals.html#streams-and-the-c-leak",
+    "href": "06-signals.html#streams-and-the-c-leak",
+    "title": "7  Signals",
+    "section": "7.4 Streams, and the C leak",
+    "text": "7.4 Streams, and the C leak\nPowerShell’s output streams are the cleanest picture of what a condition system is for, even though the substrate is different. The official list is in about_Output_Streams:\n\n\n\n\n\n\n\n\nStream\nPowerShell\nR, if you are disciplined\n\n\n\n\n1 Success\npipeline objects\nthe return value\n\n\n2 Error\nWrite-Error\nan error condition\n\n\n3 Warning\nWrite-Warning\na warning\n\n\n4 Verbose\nWrite-Verbose\na message or a classed condition behind a verbose flag\n\n\n5 Debug\nWrite-Debug\na debug condition, or cli behind a flag\n\n\n6 Information\nWrite-Information\na classed message, cli alerts\n\n\nProgress\nWrite-Progress, not redirectable\ncli progress, or a progress condition\n\n\n\nThe win is orthogonal channels. A function can return a value and warn and describe what it is doing, and the caller decides what to keep. PowerShell’s redirection (3&gt;&1, and the rules in about_Redirection) makes that a shell feature. R makes it a handler feature. The idea is the same: side-channel meaning is structured, and the host picks it up at the edge.\nTwo R-specific cuts.\nWarnings and messages are already conditions, so they can be muffled, collected, promoted to errors (options(warn = 2) is the blunt version), or given a class and a handler. cli output that goes through the condition-aware UI is in this world. A hand-rolled cat() is not. Text on the console cannot be dispatched. It can only be captured, and capture is a miserable API.\nC stdout and stderr are a second console that R’s condition system does not own. A .Call that printfs has stepped outside the protocol. Robust packages treat that as a bug unless the foreign chatter is caught and re-signaled as a condition, or explicitly documented as a debug leak. The interface principle cuts both ways. You may call C. C does not get to talk to your user behind the language’s back.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Signals</span>"
+    ]
+  },
+  {
+    "objectID": "06-signals.html#a-package-doctrine",
+    "href": "06-signals.html#a-package-doctrine",
+    "title": "7  Signals",
+    "section": "7.5 A package doctrine",
+    "text": "7.5 A package doctrine\nSmall enough to stick on the wall:\n\nReturn values for success. Type them.\nSignal classed conditions for everything a caller might route.\nPrefer calling handlers and try_fetch at library boundaries; use tryCatch when you truly mean “this attempt is over.”\nEstablish restarts where a caller could plausibly resume: skip this record, use this default, retry with this credential.\nPut narration and progress in cli or in messages, behind a preference.\nDo not cat() a situation you could signal.\nIf C talks, wrap the talk.\n\nThis is the functional-core idea applied to communication. The core returns a value or signals an object. The shell — the handler, the option, the CLI flag, the IDE — decides what the human sees. The next chapters are about why R grew a core that will not enforce any of this, and why that is survivable.",
+    "crumbs": [
+      "The Metal",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Signals</span>"
+    ]
+  },
+  {
+    "objectID": "07-lineage.html",
+    "href": "07-lineage.html",
+    "title": "8  Lineage",
+    "section": "",
+    "text": "8.1 Three principles, visible from the first blackboard\nR’s oddness is not an accident that later programmers failed to clean up. It is a hybrid engineered for interactive data analysis, afterwards asked to carry production systems. The sophistication of the REPL and the friction of a hardened package are the same design, seen from two ends.\nIn a 2016 book Chambers claimed the design of R can be summarized in three principles. He repeated them, with the history attached, in S, R, and Data Science (The R Journal, 2020). The wording there:\nHe is careful about the chronology. The principles were not invented late as a brand. They are “broadly visible from the first version of S.” The May 1976 sketch he reprints is an interface: a Fortran subroutine on one side, an S object in, an S object out. Assignment is a function. Modeling returns an object. The user language looks like scientific expressions because the likely users were comfortable with scientific expressions, and because real analyses get tree-shaped fast. A colleague’s suggestion of a shell of pipes was considered and declined. Pipes came back, decades later, as syntax over the function-call principle. They did not replace it.\nThe scalar decision is in the same essay. S had no scalar types distinct from general objects, partly because the Fortran library already managed arrays, partly because there were not enough programmers to build a second language underneath. “The intention was that low-level computations depending on these would be done through the interface to Fortran.” You are still living in that intention every time 1 is a vector.\nExtending R (Chapman and Hall/CRC, 2016) is the book the article cites for the principles, pages 4–11. The article is the piece you can actually open in a browser. Prefer it when you want the history; prefer the book when you want the design worked out as a programming model.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Lineage</span>"
+    ]
+  },
+  {
+    "objectID": "07-lineage.html#three-principles-visible-from-the-first-blackboard",
+    "href": "07-lineage.html#three-principles-visible-from-the-first-blackboard",
+    "title": "8  Lineage",
+    "section": "",
+    "text": "objects: Everything that exists in R is an object.\nfunctions: Everything that happens in R is a function call.\ninterfaces: Interfaces to other languages are a part of R.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Lineage</span>"
+    ]
+  },
+  {
+    "objectID": "07-lineage.html#a-scheme-engine-asked-to-host-s",
+    "href": "07-lineage.html#a-scheme-engine-asked-to-host-s",
+    "title": "8  Lineage",
+    "section": "8.2 A Scheme engine asked to host S",
+    "text": "8.2 A Scheme engine asked to host S\nIhaka and Gentleman’s 1996 paper in the Journal of Computational and Graphical Statistics introduces R as a language for data analysis and graphics, in the S tradition, with lexical scope taken seriously. The R Language Definition states the compromise in the introduction:\n\nThe language syntax has a superficial similarity with C, but the semantics are of the FPL (functional programming language) variety with stronger affinities with Lisp and APL. In particular, it allows “computing on the language.”\n\nChapter 6 of the same manual is the part to sit with. R “presents a friendlier interface to programming than Lisp does, at least to someone used to mathematical formulas and C-like control structures, but the engine is really very Lisp-like.” Calls are data. You can quote them, rearrange them, and eval them. Plot labels, model formulas, and tidy evaluation are applications of that fact. They are not a macro system bolted on later.\nWhat R borrowed, said plainly:\n\n\n\n\n\n\n\n\nIngredient\nWhere it came from\nWhat it still feels like\n\n\n\n\nVectors as the atom, no scalars\nFortran, S, an APL-shaped semantic habit\nRecycling, vectorized math, 1 having a length\n\n\nNA as missingness in the runtime\nS, and statistical practice\nMissingness contaminates operations, on purpose\n\n\nAttributes, lists, data frames, S3\nS\nStructure without a second object heap\n\n\nPairlists, calls as data, quote / eval\nLisp\nMetaprogramming, formulas, non-standard evaluation\n\n\nLexical scope, closures, first-class functions\nScheme, a deliberate break from classic S\nFactories, packages as namespaces, R6-via-environment\n\n\nA workspace and a search path\nS, Bell Labs, interactive analysis\nThe REPL as the primary instrument\n\n\nGeneric-function OOP\nS, with CLOS in the air\nVerbs that live outside objects\n\n\nCondition and restart machinery\nCommon Lisp, partially, and then a long cultural detour\nUnderused, next to tryCatch\n\n\nLazy arguments\nS and R’s own mix\nDefaults, NSE, the pass-by-value illusion\n\n\nReference counts, ALTREP\nR’s own implementation lineage, Tierney and collaborators\nFeels immutable, sometimes is not even allocated\n\n\nA serious collector and a byte compiler\nLater R core work, Tierney central to it\nA runtime that can carry the illusion\n\n\n\nLuke Tierney’s Lisp-Stat (Wiley, 1990) is a statistical environment built in Lisp, with dynamic graphics and objects, and Tierney later did an enormous share of R’s runtime: the generational collector, the compiler, reference counting, ALTREP. Influence is not identity. R is not Lisp-Stat with different syntax. The accurate claim is smaller. The evaluator R shipped with is Scheme-descended, and the person who then made that evaluator industrially serious had already built a Lisp for statistics. You can feel both facts in the dumps. You should not cite them as one fact.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Lineage</span>"
+    ]
+  },
+  {
+    "objectID": "07-lineage.html#what-the-corpus-said",
+    "href": "07-lineage.html#what-the-corpus-said",
+    "title": "8  Lineage",
+    "section": "8.3 What the corpus said",
+    "text": "8.3 What the corpus said\nMorandat, Hill, Osvald, and Vitek, Evaluating the Design of the R Language (ECOOP 2012), looked at the language the way language researchers look at a language: static and dynamic analysis of a large corpus. Their abstract is the quote to keep. R “combines lazy functional features and object-oriented programming. This rather unlikely linguistic cocktail would probably never have been prepared by computer scientists, yet the language has become surprisingly popular.”\nThe paper’s lasting usefulness is the permission it gives you to treat the cocktail as a design you can evaluate, not as weather. Lazy promises, vectorization, a functional core, imperative locals, more than one object system, reflection into the implementation: users pick among these ad hoc, because the language permits all of them. That finding is still true, and it is the reason a package has to have an opinion. The language will not supply one.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Lineage</span>"
+    ]
+  },
+  {
+    "objectID": "07-lineage.html#interfaces-including-the-ones-that-hurt",
+    "href": "07-lineage.html#interfaces-including-the-ones-that-hurt",
+    "title": "8  Lineage",
+    "section": "8.4 Interfaces, including the ones that hurt",
+    "text": "8.4 Interfaces, including the ones that hurt\nThe third Chambers principle is why .Call, Fortran, C++, Arrow, GDAL, and databases do not feel like foreign-function trivia in R. They feel like the original blackboard. The external pointer and the finalizer are the modern picture of that 1976 rectangle: something outside, an object on the way in, an object on the way out, and a question about who frees the memory.\nIt is also why a printf inside that rectangle is a design bug rather than a logging strategy. The interface was supposed to exchange objects. Text on a C stream is a second language the caller did not agree to parse. Chapter 7 already made this point from the condition side. From the historical side it is the same point. The interface is part of the language, so the interface has to speak the language.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Lineage</span>"
+    ]
+  },
+  {
+    "objectID": "07-lineage.html#a-clash-you-can-stop-apologizing-for",
+    "href": "07-lineage.html#a-clash-you-can-stop-apologizing-for",
+    "title": "8  Lineage",
+    "section": "8.5 A clash you can stop apologizing for",
+    "text": "8.5 A clash you can stop apologizing for\nC-like syntax, Lisp-like engine, Fortran-like data, statistical missingness, generic functions, and a reference-counted value illusion. None of these is a dialect you can subtract and still have R. The work is to know which one is speaking in a given line of code.\nA LANGSXP is the Lisp engine. A REALSXP is the Fortran data. An ENVSXP is the Scheme closure’s home, and also R6’s home. A promise is the calling convention that makes the REPL feel telepathic. NA is the statistical practice, built into the type rather than wrapped around it. REF is the modern implementation earning the value illusion the syntax has always sold. When a design argument in your package feels confused, it is often because two of these are being asked to answer the same question. Split the question. The lineage tells you which voice answers which one.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Lineage</span>"
+    ]
+  },
+  {
+    "objectID": "08-repl.html",
+    "href": "08-repl.html",
+    "title": "9  The REPL, Then the Contract",
+    "section": "",
+    "text": "9.1 What the conversation is good at\nThe language definition describes the intended first experience in passing, and it is the whole product philosophy:\nThat ladder — expression, function, package — is the honest path. It is also why a person who wants illegal states to be unrepresentable feels like they are fighting the grain. They are. The grain is a conversation. Contracts are what you write down when the conversation has discovered a thing worth keeping.\nInteractive data work wants:\nFeatures that serve that ladder are easy to mistake for sloppiness. Promises let a plotting function capture the expression you wrote. Attributes let a vector grow a class without a new runtime type. The search path lets a new package’s verbs appear in the conversation. Recycling and permissive coercion let a one-liner survive contact with a column that is almost the right shape. NA lets a summary skip missing measurements without a parallel Option type. Non-standard evaluation lets a modeling formula look like the thing a statistician would write on paper.\nMorandat and colleagues described this lifecycle as the context in which the linguistic cocktail makes sense. Take the lifecycle away and a lot of R looks indefensible. Leave it in place and the language looks like a tool that knows what the first hour of analysis is.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>9</span>  <span class='chapter-title'>The REPL, Then the Contract</span>"
+    ]
+  },
+  {
+    "objectID": "08-repl.html#what-the-conversation-is-good-at",
+    "href": "08-repl.html#what-the-conversation-is-good-at",
+    "title": "9  The REPL, Then the Contract",
+    "section": "",
+    "text": "load something real\npoke it\ndraw it\nsummarize it\nnotice which poke you are about to repeat\nwrap the repetition in a function\nand, sometimes, put the function in a package so a stranger can call it",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>9</span>  <span class='chapter-title'>The REPL, Then the Contract</span>"
+    ]
+  },
+  {
+    "objectID": "08-repl.html#what-the-conversation-will-not-do-for-you",
+    "href": "08-repl.html#what-the-conversation-will-not-do-for-you",
+    "title": "9  The REPL, Then the Contract",
+    "section": "9.2 What the conversation will not do for you",
+    "text": "9.2 What the conversation will not do for you\nThe same features are anti-features for “schema at the boundary,” until you impose a discipline above the language.\nA promise will evaluate in a surprising environment if you capture it and force it later. A class attribute will be ignored by any function that is not generic. The search path will resolve a name to whatever was attached last. Coercion will add a factor level you did not mean, or drop one. NA will flow through a logical test and return NA, and if (NA) will complain, and somewhere in that pair of behaviors a bug will hide for a year. None of this is a reason to refuse the REPL. It is a reason to treat the REPL as the place you discover the concept, and the package as the place you stop the concept from leaking.\nThe sequence that matches the ladder, said as advice:\n\nExplore with the dynamic machine. Dirty data, wrong types, one-off plots, inspect when a result is absurd.\nNotice the nouns that kept coming back, and the verbs you repeated.\nParse those nouns at the boundary. Constructors that refuse junk. format methods that make the meaning obvious.\nPackage the verbs. Generics where a stranger should be able to add a method. A handle only where identity is the feature.\n\nStep 2 is the part people skip, and then step 3 becomes ceremony around the wrong nouns. The low-level session this book came from was step 1 aimed at the language itself. That is allowed. Most days step 1 is aimed at a file full of addresses.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>9</span>  <span class='chapter-title'>The REPL, Then the Contract</span>"
+    ]
+  },
+  {
+    "objectID": "08-repl.html#why-python-and-javascript-feel-more-direct",
+    "href": "08-repl.html#why-python-and-javascript-feel-more-direct",
+    "title": "9  The REPL, Then the Contract",
+    "section": "9.3 Why Python and JavaScript feel more direct",
+    "text": "9.3 Why Python and JavaScript feel more direct\nThey default to named objects with methods. The habit “there is a class for this” is ambient, so the path from a domain noun to a bundle of behavior is short. You still do not get real contracts until you add something like Pydantic or Zod. The object was never the contract. It was a place to put methods. The contract arrives when construction parses.\nR’s ambient habit is “there is a function for this,” and a class is optional metadata on a vector. The path from a domain noun to a defended value is longer, because you are building the noun out of a vector, a class attribute, and a constructor the language considers optional. The reward, when someone actually does it, is an API that composes. A request is a value. A plot specification is a value. A data frame is a relation. Verbs take these and return these. The user interface is the vocabulary.\nThis is a personal preference and also a technical one. Dislike of message-passing as a default is compatible with respecting what that default buys: one obvious place to look for behavior. R asks you to look in the verbs, which is wonderful when the verbs are curated and miserable when every package invents a private dialect. Curation is the price of the preference. Chapter 10 is about paying it on purpose.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>9</span>  <span class='chapter-title'>The REPL, Then the Contract</span>"
+    ]
+  },
+  {
+    "objectID": "08-repl.html#where-r-wins-on-the-merits",
+    "href": "08-repl.html#where-r-wins-on-the-merits",
+    "title": "9  The REPL, Then the Contract",
+    "section": "9.4 Where R wins on the merits",
+    "text": "9.4 Where R wins on the merits\nA few comparisons, kept specific so they do not turn into team sports.\nhttr2. A request is a value you build with a pipe of functions: URL, headers, body, authentication, then perform. The introductory vignette shows the shape. Errors are classed. The perform step is the edge where the value meets the network. This is the functional core and the imperative shell in one pipeline, and it is pleasant in a way object-graphs of HTTP clients often are not. You can see the request. You can print it before you send it. Printing is part of the design.\nellmer. A conversation with a model is a session you hold, and the operations on it are a small vocabulary: send a turn, register a tool, extract a typed value. The package site is the reference. A conversation has identity — turns accumulate — so a handle is the honest representation. The design win over a large agent framework is the size of the vocabulary and the refusal to hide the request. Compare that with LangChain-style graphs when you want a lesson in what “more objects” does to a domain that wanted a few verbs. The lesson is not that Python cannot be clear. It is that a framework can spend its complexity budget on the wrong axis.\nggplot2. Wilkinson’s Grammar of Graphics gave the field a vocabulary. Wickham’s layered grammar turned it into an embedded language of data, aesthetic mappings, geoms, stats, and facets. You can dislike using it and still recognize the move. A plot is a specification, a value, built by composing layers. It is not a scene graph you mutate. Formulas in modeling packages are the older version of the same move. R’s frameworks, when they work, look like grammars.\nTidy data and verbs. Once a data frame is a relation with a convention for rows and columns, a whole ecology of verbs can share it. The win is the shared noun, not any single package. A new verb can be written without inheriting from a table class. That is open dispatch as an industry structure, and it is the subject of the next chapter.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>9</span>  <span class='chapter-title'>The REPL, Then the Contract</span>"
+    ]
+  },
+  {
+    "objectID": "08-repl.html#the-nag",
+    "href": "08-repl.html#the-nag",
+    "title": "9  The REPL, Then the Contract",
+    "section": "9.5 The nag",
+    "text": "9.5 The nag\nPython nags you early, with objects. You still need a schema library before the nag means “invalid states are unrepresentable.” R nags you late, with stopifnot scattered through helpers and with users who received a list and had to guess. Unless the package treats the contract as the product.\nThe REPL is not a betrayal of that product. It is how you find out which contracts are worth writing. The difficult part is that the language will never force the transition. You can stay in the conversation forever. Production R is the decision to leave the conversation in the places where the concept has stabilized, and to keep the conversation available everywhere it has not.",
+    "crumbs": [
+      "The Hybrid",
+      "<span class='chapter-number'>9</span>  <span class='chapter-title'>The REPL, Then the Contract</span>"
+    ]
+  },
+  {
+    "objectID": "09-open-verbs.html",
+    "href": "09-open-verbs.html",
+    "title": "10  Open Verbs",
+    "section": "",
+    "text": "10.1 Generic functions\nDecapsulating methods is a bet that a domain is an algebra. The verbs are the operations. The types are the elements they operate on. Extensibility means a new element can join an old operation, or a new operation can be defined on old elements, without anyone opening the type and adding a method to its private table.\nR made that bet early, because statistics is full of operations that apply to more than one kind of thing: print, plot, summary, predict, coef, [. A model object does not contain the verb predict. The verb exists, and methods attach to it. Rust made a related bet for different reasons, and the resemblance is real if you do not sand off the parts that do not resemble.\nIn the generic-function tradition, the operation is a function and the method is chosen from the arguments. CLOS is the carefully designed version: multi-argument dispatch, method combinations, classes that do not own their behavior. S3 is the casually designed version that won: a naming convention, a search along the class vector, first-argument dispatch unless you reach for something richer. S4 adds formality and multiple dispatch. S7 keeps S3’s compatibility and adds a class and property model worth using. Advanced R’s object-oriented chapter sorts these without pretending they are one system.\nThe user’s daily experience of the bet:\nMessage-passing inverts the sentence. obj.predict() asks the object which method to run. Discovery is “what does this object know?” Extension is subclassing, wrapping, or patching. Python and JavaScript made this the default and it fits simulation-shaped problems: widgets, game entities, documents with a long identity, ORMs whose rows really are handles. It fits data work only after you build a second, functional layer on top and try not to talk about it.\nR has both, and the culture never fully picked. R6 and reference classes are the message-passing wing. S3/S4/S7 are the generic-function wing. The winning user interfaces in statistics and in the tidyverse are still verb(noun) or noun |&gt; verb(). $ exists. It is not a moral failure to use it on a handle. It is a clue that you have built a handle.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>10</span>  <span class='chapter-title'>Open Verbs</span>"
+    ]
+  },
+  {
+    "objectID": "09-open-verbs.html#generic-functions",
+    "href": "09-open-verbs.html#generic-functions",
+    "title": "10  Open Verbs",
+    "section": "",
+    "text": "a new package implements format.my_class and the console changes\na new package implements predict.my_model and old code starts working\nnobody subclasses the original type\nthe verb stays a function, so it can sit in a pipe, a script, or a shell",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>10</span>  <span class='chapter-title'>Open Verbs</span>"
+    ]
+  },
+  {
+    "objectID": "09-open-verbs.html#what-rust-actually-shares",
+    "href": "09-open-verbs.html#what-rust-actually-shares",
+    "title": "10  Open Verbs",
+    "section": "10.2 What Rust actually shares",
+    "text": "10.2 What Rust actually shares\nRust methods are sugar over functions. value.method(args) is Type::method(value, args) or Trait::method(value, args). There are two places a method can come from:\n\nan inherent impl Type block, which is closed: only the crate that owns the type adds these\na trait implementation, which is open in a controlled way: other crates can implement the trait for their own types\n\nThe traits chapter of the Rust book is the mechanism. The API guidelines are the culture: types carry invariants, traits carry shared behavior, and a lot of the surface area of a good crate is functions. Ownership and lifetimes have no R equivalent, and pretending otherwise is how the comparison gets cute and then wrong. The comparison that holds is the shape of the code you read. You navigate a vocabulary of functions. Types are the backbone those functions accept. Dispatch is a property of the operation. A new type can join Display, or predict, without editing the original module.\nRust’s orphan rules are the part R deliberately does not have. A trait implementation has to be coherent: you cannot have two crates each defining Display for the same foreign type and then wonder which one runs. R will happily let the next attached package mask a method, and UseMethod will pick whatever is found first on the search path. That is the extensibility and the footgun in one rule. Packages manage it with conventions, imports, and a refusal to define methods for classes they do not own unless that is the whole point of the package. The footgun is not an argument against open verbs. It is an argument for a curated vocabulary, which is the same argument the naming section already made.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>10</span>  <span class='chapter-title'>Open Verbs</span>"
+    ]
+  },
+  {
+    "objectID": "09-open-verbs.html#naming-as-the-module-system-you-actually-use",
+    "href": "09-open-verbs.html#naming-as-the-module-system-you-actually-use",
+    "title": "10  Open Verbs",
+    "section": "10.3 Naming as the module system you actually use",
+    "text": "10.3 Naming as the module system you actually use\nThinking in functions and shell-like procedures matches how you navigate a codebase under this bet.\n\napi_config_new, api_client_fetch, color_brightness\ncheck_*, as_*, format_*, req_*\nRust’s module::function\n\nThe prefix is the module. The package namespace is the fence. IDE navigation is symbol search over a vocabulary you chose, which is the same muscle as a good CLI. Encapsulation, in this style, means three things and refuses a fourth:\n\nsemantic: illegal states do not parse\nnominal: the names are stable and the namespace is real\ndisciplinary: effects and handles are obvious in the signature\nnot: every verb hides behind self.\n\nDot-driven objects optimize for one blob of state with a toolbox attached. Function-and-type systems optimize for pipelines, scripts, and verbs that apply to more than one noun. Data work is the second shape. So are HTTP clients, tool-using model loops, and compilers. When an R codebase feels like Java with the classes rubbed off, it is usually because the verbs were never written down as verbs. The methods exist, scattered across files named after nouns, and the user interface is whatever you discover by typing $ and waiting.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>10</span>  <span class='chapter-title'>Open Verbs</span>"
+    ]
+  },
+  {
+    "objectID": "09-open-verbs.html#algebras-not-simulations",
+    "href": "09-open-verbs.html#algebras-not-simulations",
+    "title": "10  Open Verbs",
+    "section": "10.4 Algebras, not simulations",
+    "text": "10.4 Algebras, not simulations\nThe cold version of the strength:\nA simulation asks “what does this thing do next?” An algebra asks “what operations exist on these things, and which laws do they obey?” R’s generic functions are a bet on the second question. So are Rust traits, CLOS generic functions, and type classes in Haskell. Python’s classes are a bet on the first, with protocols and functools.singledispatch as the escape hatches for people who wanted the second bet after all.\nYour preference is not anti-object. It is objects as a facade over a functional surface. Types carry meaning. Generics carry extensibility. Functions are what humans, pipes, and shells invoke. That is a coherent production style. It is one of the real reasons to stay in R when the alternative is an object graph that can do anything and explains nothing.\nThe style has a failure mode worth naming. A vocabulary nobody curates becomes a junk drawer of verbs: three ways to say “fetch,” methods defined for classes the package does not own, generics with a single method that should have been a function. Open dispatch is valuable when there is a second implementation in sight, or a stranger who might write one. A private function is a fine verb. Not everything has to dispatch. The test is whether a new noun should be able to join without editing the call sites. If yes, write the generic. If no, write the function and keep the name clean.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>10</span>  <span class='chapter-title'>Open Verbs</span>"
+    ]
+  },
+  {
+    "objectID": "10-containers.html",
+    "href": "10-containers.html",
+    "title": "11  Where State Lives",
+    "section": "",
+    "text": "11.1 Four questions\nStatefulness is fine. Undeclared statefulness is what bites. Picking a container is picking where identity, validation, and lifetime live, and the runtime has already limited the menu. You do not invent a third physics. You choose a value or a handle, and you say so in the type.\nAsk them in order.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>11</span>  <span class='chapter-title'>Where State Lives</span>"
+    ]
+  },
+  {
+    "objectID": "10-containers.html#four-questions",
+    "href": "10-containers.html#four-questions",
+    "title": "11  Where State Lives",
+    "section": "",
+    "text": "Does anyone need to observe mutation of the same object? An open connection, a token that refreshes, a cache, a progress meter, a conversation. Yes means a An object whose identity is part of the API. Aliases observe the same evolving state.reference owner: an environment, an R6 object, an external pointer, or an S7 class that has deliberately chosen environment physics. No means a value. Lists, S3 objects, and ordinary S7 objects are values. Copy-on-modify is the physics, whether you think about it or not.\nIs this a domain fact or a process capability? Config, enums, colors, response schemas, and parsed documents are facts. They want to be values, because you want to compare them, print them, and put them in tests. “Talk to this API,” “hold this socket,” “retry with backoff” are capabilities. They want a handle that owns or receives values.\nWho owns the lifetime? Process-wide defaults belong in a small package environment or in options(), documented, and treated as defaults rather than as the real API. Per session, per test, per request: construct the value or the handle and pass it. Hidden &lt;&lt;- into a parent the caller cannot name is how a helper becomes a seance.\nWhere do the contracts live? This is not “S7 or S3 depending on how serious you are.” Illegal states should be unrepresentable either way. The question is whether the contract is a ritual you maintain (new_*, validate_*, as_*, format_*) or a structure the object carries (S7 properties, validators, generics). Chapter 12 takes that fork. It does not weaken question 1.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>11</span>  <span class='chapter-title'>Where State Lives</span>"
+    ]
+  },
+  {
+    "objectID": "10-containers.html#a-concrete-map",
+    "href": "10-containers.html#a-concrete-map",
+    "title": "11  Where State Lives",
+    "section": "11.2 A concrete map",
+    "text": "11.2 A concrete map\nThe API-shaped version, because it keeps coming up:\n\n\n\n\n\n\n\n\nThing\nContainer\nWhy\n\n\n\n\napi_config: base URL, timeouts, auth material, enums\nS7 or S3 value\nA snapshot. Cheap to compare. Easy to build in a test. No identity.\n\n\napi_client: request factory, token refresh, rate limit\nR6, an environment, or a thin handle around httr2\nIdentity matters. The token you refresh is the token the next call must see.\n\n\nPackage default config\nLocked package environment, or options()\nBootstrapping. Override by argument, not by a global write in the hot path.\n\n\nCall-site wiring\nPass the client in\nTests inject fakes. Scripts inject the real handle.\n\n\n\nconfig   : value     what is true\nclient   : handle    what can act\nfunctions: take the handle, and take config overrides as values\npackage environment: defaults and registries only\nThe anti-pattern is one class that is both the config record and the live session. You then either mutate a thing that prints like a value, or you copy a thing that was supposed to be a handle and wonder why the refresh did not stick. The physics will not save you from that confusion. It will obey whichever choice you accidentally made.\nGary Bernhardt’s talk Boundaries names the larger shape: a functional core that decides, an imperative shell that performs effects. In R the core is values and verbs. The shell is the handle, the options() read at the edge, the handler that decides how a condition is shown. “Functional core, imperative shell” is not a style for people who dislike objects. It is a rule for where objects with identity are allowed to stand.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>11</span>  <span class='chapter-title'>Where State Lives</span>"
+    ]
+  },
+  {
+    "objectID": "10-containers.html#dependency-injection-without-the-enterprise-voice",
+    "href": "10-containers.html#dependency-injection-without-the-enterprise-voice",
+    "title": "11  Where State Lives",
+    "section": "11.3 Dependency injection without the enterprise voice",
+    "text": "11.3 Dependency injection without the enterprise voice\nPassing the client is dependency injection. You do not need a container framework. You need an argument.\n\nPackage environment or options. Defaults, feature flags, a memoised registry, the current printing width. Ambient, documented, easy to override in a test by setting the option inside withr::with_options or by not reading the option when an argument was supplied.\nArguments. Anything that changes the correctness of a call. If a test must swap it, it is an argument, or it is a field of a handle that was built from an argument.\nThe hybrid that stays sane. client &lt;- api_client_new(config = api_config_default()), and api_config_default() reads the option once. Callers who care pass a config they built themselves. Callers who do not care get the default. Nobody reaches through &lt;&lt;-.\n\nThis is also the answer to “a package environment versus a client that closes over the config.” The package environment is a process-lifetime default. The client is a value you chose to give identity because it acts. Functions that quietly call get_config() from the package environment are hard to test and hard to reason about, and they feel convenient for exactly as long as you have one config. The day you have two — prod and sandbox, this tenant and that tenant — the hidden lookup becomes the bug.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>11</span>  <span class='chapter-title'>Where State Lives</span>"
+    ]
+  },
+  {
+    "objectID": "10-containers.html#reactivity-is-the-tell",
+    "href": "10-containers.html#reactivity-is-the-tell",
+    "title": "11  Where State Lives",
+    "section": "11.4 Reactivity is the tell",
+    "text": "11.4 Reactivity is the tell\nThe notebook’s guess about reference semantics was right, and it is the best reason to choose a handle on purpose. If a later step must observe that this object changed — invalidate a cache, advance a progress bar, refresh a token that other calls share — then identity is part of the feature. Values can imitate this with explicit returns and with reactive frameworks that diff old and new, and sometimes that imitation is the point. Shiny’s reactive graph is a disciplined version. It is a lot of machinery to reach for when an environment would have been the honest model.\nThe converse tell: if you never observe identity, a reference object is paying for a capability you do not use, and you are giving up the ability to treat the thing as a value in tests and in pipes. S7 getters and setters do not change this. A setter on a value returns a new value. A setter on a handle mutates. The syntax can be made to look similar. The addresses will not.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>11</span>  <span class='chapter-title'>Where State Lives</span>"
+    ]
+  },
+  {
+    "objectID": "10-containers.html#superassignment-one-last-time",
+    "href": "10-containers.html#superassignment-one-last-time",
+    "title": "11  Where State Lives",
+    "section": "11.5 Superassignment, one last time",
+    "text": "11.5 Superassignment, one last time\n&lt;&lt;- is the undeclared version of a handle. It can implement the same patterns, and people do, and the patterns work until the enclosure chain is not the one they imagined. Lexical scope is a feature when you are resolving a free variable on purpose. It is a liability when you are using it as a mutable store you refused to name.\nIf you want the pattern “scratch space inside a function, value out,” do that with a local environment and return a list or an S7 object. The environment dies with the call. The value carries the facts. That is the ST pattern from Chapter 5, performed by hand, and it is a good pattern. The moment the environment is returned, or stored in the package environment, you have built a handle. Then name it as a handle and give it a type, so the next reader does not have to discover the identity by calling lobstr::obj_addr.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>11</span>  <span class='chapter-title'>Where State Lives</span>"
+    ]
+  },
+  {
+    "objectID": "11-types.html",
+    "href": "11-types.html",
+    "title": "12  Types Without a Checker",
+    "section": "",
+    "text": "12.1 The ritual you have already been performing\nThe desire is not for a particular compiler. It is for the situation in which a name admits only the values that mean that name, in a shape you can rely on, with the structural work done by the runtime’s garbage collector instead of by a borrow checker. Rust, Zod, Pydantic, an S3 constructor ritual, and an S7 property are the same mental model at different distances from the bits. R’s gap is that defining the type is not a pleasant, first-class act. You assemble it.\nThat gap is not a reason to lower the standard. If the work is production work, invalid states are unrepresentable. “Mostly conventions” is how you describe a prototype, not a package other people call.\nThe S3 version of parse-don’t-validate is a small protocol, repeated until it becomes muscle:\nThat is “illegal states unrepresentable.” It is unrepresentable by convention, which means a later edit can build the object through new_* and skip validate_*, and the type system will not notice. The protocol works in the packages where someone is strict about the doors. It drifts in the packages where the doors multiply.\nS7’s contribution is not a new philosophy. It is a place to put the protocol so the drift has to work harder:\nIts cost is authoring. Next to a Zod schema or a Pydantic model, an S7 class is verbose, and the official examples often stop at class_any plus a check inside a method. That teaches the syntax. It does not teach the reason you reached for a class. The S7 design notes are the attempt to write the missing practice down: what knowledge the model carries, where a rule lives, when a property should itself be a class, how editable values differ from snapshots and from reference owners. This chapter will not repeat that book. It will connect it to the metal, and to the envy.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>12</span>  <span class='chapter-title'>Types Without a Checker</span>"
+    ]
+  },
+  {
+    "objectID": "11-types.html#the-ritual-you-have-already-been-performing",
+    "href": "11-types.html#the-ritual-you-have-already-been-performing",
+    "title": "12  Types Without a Checker",
+    "section": "",
+    "text": "new_* builds the structure and does not check\nvalidate_* states the laws and fails with a classed error\nthe user-facing constructor calls both, and is the only door\nas_* coerces at the boundary and then goes through the door\nformat_* / print / str make the value legible\n\n\n\n\nproperty contracts live on the property\njoint laws live on the class validator\nthe constructor is the door\ngenerics are a stronger dispatch story when the verbs and the nouns both grow",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>12</span>  <span class='chapter-title'>Types Without a Checker</span>"
+    ]
+  },
+  {
+    "objectID": "11-types.html#the-envy-is-a-diagnostic",
+    "href": "11-types.html#the-envy-is-a-diagnostic",
+    "title": "12  Types Without a Checker",
+    "section": "12.2 The envy is a diagnostic",
+    "text": "12.2 The envy is a diagnostic\nZod and Pydantic make parsing the default gesture. You write the shape once. Construction fails or you hold a value. Consumers trust the type. The authoring experience is the feature. People adopt the library because the schema is shorter than the bugs it prevents, not because they read an essay about bounds.\nS7 can express the same designs. A property can name a class, a union, a base type, a validator, a getter, a setter. A class validator can state laws that mention more than one property. convert can sit at the edge where JSON becomes a domain value. The machinery is further along than the examples suggest. What is missing is the worn path: the way a competent author reaches for a reusable property the way a TypeScript author reaches for z.number().int().min(0).max(255). Until that path exists, production S7 will keep looking under-typed, not because the objects cannot carry the law, but because class_any is the path of least resistance and the checks leak back into the methods.\nThe metal already ratted this out. In the notebook, a property defined as p = class_any inspects as an S7_property record. The names visible in the dump include name, class, getter, setter, and validator. The record’s length is 6; the paste elides one name, so this book will not invent it. The getter, setter, and validator slots in that particular property are Nil. class points at the empty S7_any vector. The structure for a real property contract is allocated. The example left it blank and postponed the law to whoever uses p later.\nThat is the whole complaint, photographed. Filling those slots is the work. A scalar-or-null string is a type, expressed as a union or as a property validator, not as class_any followed by if (!is.null(x)) in every method. An enum of five statuses is a class or a property whose validator knows the five strings, not a character and a prayer. A color with channels in 0:255 stores the channels under validators and exposes brightness as a getter, so brightness cannot drift out of agreement with the channels. An API response becomes one class per reusable object, with coercion at the edge and nowhere else.\n\n\n\n\n\n\n\nThe law\nWhere it lives\n\n\n\n\nThis field’s shape, range, and presence\nthe property\n\n\nThese fields together\nthe class validator\n\n\nWire format into the domain\nthe constructor, or convert, at the boundary\n\n\nWhat we do when we talk to the world\nverbs on a handle, or generics on the values\n\n\n\nChecks inside methods rediscover the law at every call site. They do not compose. A property validator composes: every constructor, every replacement, every subclass that reuses the property, gets the same door.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>12</span>  <span class='chapter-title'>Types Without a Checker</span>"
+    ]
+  },
+  {
+    "objectID": "11-types.html#s3-when-you-already-own-the-ritual",
+    "href": "11-types.html#s3-when-you-already-own-the-ritual",
+    "title": "12  Types Without a Checker",
+    "section": "12.3 S3 when you already own the ritual",
+    "text": "12.3 S3 when you already own the ritual\nUse the manual protocol when the vocabulary is small, the type is a thin wrapper, and you already trust yourself to keep the doors closed. Use it when the community already speaks the class (data.frame, an httr2 response) and a formal property model would be a translation nobody asked for. Use S7 when you are inventing the model: schemas, configs, enums, validated quantities, anything that will grow a second property and a third invariant. Use neither as a costume. An S7 class full of class_any is a list with a longer error message. An S3 class with no constructor is a string someone set an attribute on.\nThe dispatch difference is real and secondary. S7’s generics are a better instrument when verbs and nouns multiply. They do not fix a model that was never written. Choose S7 when you want the contracts attached to the object and you are willing to fill in the slots the dump already showed you. Choose S3 when the ritual is short enough to see in one screen and you will actually perform it.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>12</span>  <span class='chapter-title'>Types Without a Checker</span>"
+    ]
+  },
+  {
+    "objectID": "11-types.html#print-methods-are-part-of-the-type",
+    "href": "11-types.html#print-methods-are-part-of-the-type",
+    "title": "12  Types Without a Checker",
+    "section": "12.4 Print methods are part of the type",
+    "text": "12.4 Print methods are part of the type\nHadley’s packages are the existence proof that this is not academic. A finished type has a format that tells the truth in one line, a print that uses it, and a str that does not dump the SEXP. That is not decoration on top of an object system. It is how a value announces itself in the REPL, which is still where R is used, including by the person who wrote the package and has forgotten the shape. Chapter 13 pushes this further, toward views as a separate contract. For this chapter it is enough to say that a constructor without a format method is half a type.\nFunctional composition is the other half of the same craft. Small verbs, each accepting a defended value and returning one, compose. A class hierarchy that you have to enter to get anything done does not compose with the pipe, the script, or the test. The OO in a good R package is the minimum that makes the verbs generic and the values meaningful. The rest is functions. That is a taste. It is also what the language is good at, once you stop apologizing for the missing checker and supply the parse yourself.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>12</span>  <span class='chapter-title'>Types Without a Checker</span>"
+    ]
+  },
+  {
+    "objectID": "11-types.html#where-to-spend-the-verbosity",
+    "href": "11-types.html#where-to-spend-the-verbosity",
+    "title": "12  Types Without a Checker",
+    "section": "12.5 Where to spend the verbosity",
+    "text": "12.5 Where to spend the verbosity\nVerbose types and boring call sites means the bet paid off. Verbose call sites mean the rules were left in the methods. Move a constraint into a property until constructing the object feels as dull as calling integer(). Dull is the goal. The interesting thinking happens once, when you decide what the name admits, and then it stops happening in every function that receives one.\nDo not spend the verbosity on temporary lists inside a function. A local list(a = 1, b = 2) does not need a class. Spend it at boundaries: the wire, the file, the public argument, the value you put in a package’s return position. Those are the places other code will otherwise rediscover the law, badly, under time pressure.\nThe companion book works the design consequences in detail: property versus class, presence versus default, snapshots versus reference owners, the checking ladder, dispatch as a vocabulary of verbs. Start at the overview if you want that argument at full length. The claim this chapter adds is only that the runtime is not the obstacle. The authoring path is. The nodes will happily carry a strict model. Someone has to write the model as if the slots were the point, because they are.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>12</span>  <span class='chapter-title'>Types Without a Checker</span>"
+    ]
+  },
+  {
+    "objectID": "12-appearance.html",
+    "href": "12-appearance.html",
+    "title": "13  Shown on Purpose",
+    "section": "",
+    "text": "13.1 The pipe carries objects\nA type that cannot show itself is a schema with no error messages. The same instinct that wants a parser at the boundary wants a view at the boundary. Structure, validity, and presentation are one design surface, split into layers so they can change at different speeds.\nR gets you part of the way by cultural habit. print, format, and str are generics, so a class can own its appearance without owning the console. cli raised the ceiling: a package can look like a small text interface, with semantic roles for alerts, progress, and inline values, instead of a pile of pasted strings. You can tell a finished package by the console. The unfinished ones dump print.default and apologize with a vignette.\nPowerShell gets you the rest of the idea, and then shows you how an idea can outlive its file format.\nJeffrey Snover wrote the Monad manifesto on 8 August 2002. The public copy lives on Microsoft Learn and as a PDF. The sentence that matters, against a tradition of “prayer-based parsing” of text:\nDownstream commands reflect on those objects. Format-Table is a command at the end of the pipeline, not a conversion that happens in the middle. The manifesto is explicit that once you have rendered text, you are back in the world of prayer. Formatting is a host concern. The objects survive until the host.\nThat is the alignment with the R taste, and it is worth saying without irony. The substrate is a large, formally specified object runtime. The experience on top is a shell: verbs, pipelines, streams, discoverable help. The object model is the backbone. It is not the user interface. R’s version is less formal and strangely similar. SEXPs are the backbone. Functions are the user interface. print is what the host does when the pipeline ends and a human is watching.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>13</span>  <span class='chapter-title'>Shown on Purpose</span>"
+    ]
+  },
+  {
+    "objectID": "12-appearance.html#the-pipe-carries-objects",
+    "href": "12-appearance.html#the-pipe-carries-objects",
+    "title": "13  Shown on Purpose",
+    "section": "",
+    "text": "Instead of piping unstructured text, we pipe .NET objects.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>13</span>  <span class='chapter-title'>Shown on Purpose</span>"
+    ]
+  },
+  {
+    "objectID": "12-appearance.html#format-data-is-a-view-contract",
+    "href": "12-appearance.html#format-data-is-a-view-contract",
+    "title": "13  Shown on Purpose",
+    "section": "13.2 Format data is a view contract",
+    "text": "13.2 Format data is a view contract\nFormat.ps1xml files, and the views that replaced them, declare how a type is shown: a table, a list, a wide view, a custom view. The official description is about_Format.ps1xml. The important sentence in that document: the formatting affects the display only. It does not change which properties flow down the pipeline.\nBeginning in PowerShell 6, the built-in views moved into the source code. The XML files from Windows PowerShell 5.1 are not how the default views are defined anymore. Custom Format.ps1xml files still work, and Update-FormatData still loads them. The file format is the part that aged. The separation did not. Wanting the idea “revamped into something better” is in agreement with the direction the shell already took. Keep the contract — a declarative view, distinct from the value, swappable by the host — and retire the ceremony that got you there in 2006.\nThe Extended Type System is the companion move. ETS can adapt how a type presents members and type names without you owning the class, which is how a shell stays useful in a world of ADO tables, WMI objects, and XML whose reflected shapes are not the shapes a human wants. The manifesto calls the piece an extended type reflector. You do not subclass FileInfo to make Get-ChildItem show Length and LastWriteTime. You project it.\nS3 generics are a cousin of that reflector. format.my_class adds a view from outside the value. What R never grew is the declarative pack: a data file, reviewed like data, that says “this class renders like so in a console, and like so in a markdown table,” without the rendering buried in a method that mixes policy with string concatenation. cli themes and format methods are the craft version. They work. They are code, so they are harder to swap per host than a view definition would be. If you ever build the missing piece, build it as data. The method can interpret the data. The data should be the design.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>13</span>  <span class='chapter-title'>Shown on Purpose</span>"
+    ]
+  },
+  {
+    "objectID": "12-appearance.html#a-short-unromantic-history",
+    "href": "12-appearance.html#a-short-unromantic-history",
+    "title": "13  Shown on Purpose",
+    "section": "13.3 A short, unromantic history",
+    "text": "13.3 A short, unromantic history\nThe affection for this design sometimes gets told as a single arrow from Cairo to Longhorn to WinFS to .NET to PowerShell. The arrow is a mood, not a genealogy, and the mood survives a more accurate story.\nCOM gave Windows a binary notion of interface identity. IUnknown, vtables, reference counts, a contract you could implement from more than one language. It also gave the industry DLL hell. The idea that survived is metadata and interfaces, not the binary layout.\nCairo was an early-1990s attempt at an object-oriented operating system. It did not ship as conceived. Pieces of the thinking scattered into later Windows. It is not the parent of the CLR.\nLonghorn’s WinFS was an attempt to make the filesystem a store of typed items. It was cut. It did not grow up into .NET. The dream — systems that speak in typed items rather than opaque files — is a recurring Microsoft dream, and it has failed as a product more than once. The failure does not make the dream stupid. It makes it a bad causal claim.\n.NET is a managed runtime with serious metadata, designed around the turn of the century, informed by COM’s successes and scars and by other language runtimes. PowerShell is Monad: Snover’s bet that an administrative shell on that runtime should pipe objects and format at the edge. That bet shipped. It is the piece you can actually learn from, because it has docs, an object pipeline, streams, and a view layer you can point at.\nTake the aesthetic and leave the arrow. Typed meaning in the middle. Declarative projection at the host. Mutation and I/O quarantined. The backbone can be SEXPs and generics, or CLR metadata and ETS. The shape of the program is the part worth copying.\nDSC, mentioned in the same breath, is the instinct aimed at desired state instead of desired display: say what should be true, let the system converge. It is a different feature and the same love of declarative descriptions. This book does not have a chapter on configuration management. It has a chapter on the love.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>13</span>  <span class='chapter-title'>Shown on Purpose</span>"
+    ]
+  },
+  {
+    "objectID": "12-appearance.html#what-to-do-in-an-r-package-this-week",
+    "href": "12-appearance.html#what-to-do-in-an-r-package-this-week",
+    "title": "13  Shown on Purpose",
+    "section": "13.4 What to do in an R package this week",
+    "text": "13.4 What to do in an R package this week\nYou do not have format data. You have generics and cli. Use them as if the view were a contract.\n\nWrite format.&lt;class&gt; to return a character vector of the meaning, not a dump of the slots. One line if the value is a fact. A short block if the value is a document.\nWrite print.&lt;class&gt; as a thin caller of format, returning the value invisibly, so the REPL stays a conversation.\nUse cli for situations: alerts, progress, inline code and values. Give the output semantic roles so a theme can restyle it.\nKeep the view free of decisions. Formatting does not fetch, validate, or mutate. If print has a side effect beyond writing, the contract is already confused.\nWhen a value has more than one useful projection — a one-line summary, a verbose dump, a markdown row — make those named functions, not flags buried in print. PowerShell’s table-versus-list split is the model. You can ship it as format and format_details long before you have a view file format.\n\nAnd connect it back to streams. The view is what success looks like. The condition system is what the other channels look like. A package that formats its values and signals its situations, and never cat()s either, feels finished because both contracts are present. A package that only computes the right answer still feels like a sketch. The console is part of the product, especially in a language whose main instrument is a conversation.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>13</span>  <span class='chapter-title'>Shown on Purpose</span>"
+    ]
+  },
+  {
+    "objectID": "13-data-drives.html",
+    "href": "13-data-drives.html",
+    "title": "14  Data Drives the Design",
+    "section": "",
+    "text": "14.1 What to stop arguing about\nThe machinery is secondary. OO or functional, compiled or collected, checked by rustc or by a constructor: those are how you pay for a smaller set of demands.\nNames. A curated vocabulary. Domain-driven design’s ubiquitous language, scaled to a package or to one developer’s system, not reserved for a program with the word “enterprise” in the brief. The names are the model. If you cannot say the sentence without inventing a noun, the model is missing a noun. If you have three nouns for one fact, the model is avoiding a decision.\nTypes. A name admits only valid, structured values. The structure is known. The meaning is the name, not the payload. An integer64 that is secretly a double is a tolerated lie at the physics layer; at the vocabulary layer the name still has to mean a 64-bit integer, and the verbs have to keep the lie from leaking. A status that is secretly any string is a lie at the vocabulary layer, which is worse, because nothing downstream can recover the five legal values by inspecting the SEXPTYPE.\nViews. How a value appears is configurable in the best systems and hand-written in R, and in both cases it is part of the contract. The view is not the value. Format at the host.\nVerbs. Functions do the work. Open dispatch attaches them to types without trapping them inside types. A workflow is a composition of verbs that values flow through. When a step needs identity — a socket, a token, a conversation — the value flowing through is a handle, and the handle is explicit.\nData first. The shapes in the domain drive the types. You do not start from a class hierarchy you admired in another codebase and pour the data in. You start from the record, the enum, the document, the event, and you ask what must be true of each. The functions arrive when the shapes can survive a round trip through a verb without losing a law.\nEverything earlier in the book is a detail under this picture.\nThe header, the three empties, cons against vectors, reference counts, ALTREP, and promises explain why the values in the middle can be cheap and still behave like values. The context chapter explains why a handle is a different node, not a different mood. Signals explain how failures and narration stay structured while the values move. The lineage explains why the picture feels natural in R and slightly uphill to enforce. The container rules are the picture applied to one API. The type chapter is the picture applied to a language that will not write the boxes for you. The appearance chapter is the view box, which people skip and users feel.\nWhether a given package is “really OO” is not a useful argument. Whether its names are curated, whether its constructors parse, whether its printers tell the truth, and whether its verbs are open where a stranger should be able to extend them: those are useful arguments. You can win them in S3, in S7, in Rust, in PowerShell, in a disciplined corner of Python. You can lose them in all five, loudly, with a lot of classes.\nComposition over inheritance falls out of the same picture. Inheritance bundles “what I am” with “what I can do” and with “how I am stored.” The picture wants those separable. A subtype is a real tool when the domain has a real inclusion and the laws of the parent are laws of the child. It is a bad tool when what you wanted was a new verb, or a new view, or a nullable field. R’s generic functions make the good case easy and the bad case unnecessary. You can still build the bad case. The language is not going to slap the metaphor out of your hand.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>14</span>  <span class='chapter-title'>Data Drives the Design</span>"
+    ]
+  },
+  {
+    "objectID": "13-data-drives.html#the-stance-small-enough-to-reuse",
+    "href": "13-data-drives.html#the-stance-small-enough-to-reuse",
+    "title": "14  Data Drives the Design",
+    "section": "14.2 The stance, small enough to reuse",
+    "text": "14.2 The stance, small enough to reuse\nTreat R as a Scheme-powered array language for having a conversation with data. Let the conversation discover the nouns. Then make the nouns boring: parsed, printable, and passed to verbs. Keep mutation in handles at the edge. Keep foreign runtimes behind interfaces that exchange objects and lifetimes, not surprise text. Pick one story for failure at each boundary.\nThe value illusion is what makes the middle of that program pleasant. You get to think in values while the runtime shares, delays, and sometimes never allocates. The illusion is not permission to forget the edge. At the edge, identity is real, the network is real, missingness is real, and the user’s eye is real. Name those too.\nYou were not messing around without a goal. You were checking, from the node header upward, whether a taste you already had was compatible with the machine you actually run. It is. The machine will not write the program in that taste. It will only stop punishing you for it, provided you stop asking a value to be a handle, a signal to be a string, and a name to be a hope.",
+    "crumbs": [
+      "The Taste",
+      "<span class='chapter-number'>14</span>  <span class='chapter-title'>Data Drives the Design</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html",
+    "href": "lab.html",
+    "title": "Appendix A — Lab Notebook",
+    "section": "",
+    "text": "A.1 Where inspect comes from\nThis is the original session, retold as a sequence of probes. The point of the retelling is the order. A hypothesis was written down. The next call confirmed it, qualified it, or killed it. That rhythm is worth more than any particular flag.\nThe script is a private scratch file. What follows is the part that generalizes. Where a printed REF count depended on RStudio holding extra references, the count is reported as a phenomenon, not as a constant.\nThe file opens on the right question: is inspect itself a SEXP you can study, or a door into the C runtime? It is a door. .Internal(inspect(x)) calls do_inspect. The value you pass is the SEXP. The printer is an entry in the internals table. Chapter 2 decodes a line. The rest of this notebook assumes that decoding.\nA classed list (structure(list(x = 1L), class = \"obj\")) showed the whole vocabulary at once: a VECSXP with OBJ and ATT, a child INTSXP, and an attribute LISTSXP whose tags were the symbols names and class. Those symbols were locked, saturated, and old (g1). The character data was a cached CHARSXP. One object, three worlds: generic vector, atomic vector, cons chain.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#nil-and-the-hypothesis-that-overreached",
+    "href": "lab.html#nil-and-the-hypothesis-that-overreached",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.2 Nil, and the hypothesis that overreached",
+    "text": "A.2 Nil, and the hypothesis that overreached\nNULL, c(), and pairlist() shared an address, type 0, REF(65535). identical() stayed true under the strict switches, including extptr.as.ref = TRUE. The comment drew the natural conclusion: any genuinely empty thing is that cell.\nlist() and alist() retired the conclusion for generic vectors. Each was a fresh length-zero VECSXP. integer(), double(), character(), logical(), complex(), and raw() retired it for the atomics. The comment had guessed that lists were VECSXP because they need method dispatch. The type is older than that need. Dispatch consults the class and the OBJ bit. An empty list with no class is already not Nil. Chapter 3 is the write-up. The primitive-generic vectors printed next to the hypothesis (.S3PrimitiveGenerics, .internalGenerics) are about which verbs are wired into C, not about why the empty list exists.\ntypeof(character()) is \"character\" and the SEXP type is STRSXP. The comment’s STRSEXP was a reasonable coinage. The cache of individual strings is the CHARSXP layer underneath.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#primitives",
+    "href": "lab.html#primitives",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.3 Primitives",
+    "text": "A.3 Primitives\nsum and + and c printed as builtins, type 8, saturated, old. [ printed as a special, type 7. Printing a primitive shows .Primitive(\"sum\") rather than a body. That is the applicative-versus-raw split from Chapter 6, met in the wild. These types are not mythical. They are what typeof of the function returns, any time you ask.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#a-double-wearing-a-class",
+    "href": "lab.html#a-double-wearing-a-class",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.4 A double wearing a class",
+    "text": "A.4 A double wearing a class\nbit64::integer64() has typeof \"double\" and inspects as a REALSXP with OBJ, ATT, and class \"integer64\". The comment called this interesting and then, later, connected it to factors. Factors felt like they might be “more of an object” in the OBJSXP sense. They are not. is.object(factor(1)) is true because the OBJ bit is set. typeof is \"integer\". The historical SEXP types for factors were 11 and 12, and they were withdrawn. The “lie about storage” pattern is the living design. Chapter 6 keeps the two meanings of “object” apart so they can stay apart.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#conditions-left-open-on-purpose",
+    "href": "lab.html#conditions-left-open-on-purpose",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.5 Conditions, left open on purpose",
+    "text": "A.5 Conditions, left open on purpose\nThe long comment is the seed of Chapter 7. Conditions look like a CLOS-style system, the surrounding culture uses them as exceptions, and errors-as-values (purrr, rlang results, validators) sit nearby unused. The comment’s own correction is the one to keep: it is S3 on a signaling foundation, not CLOS. The resemblance to Pitman is in the shape — signal, handle on the live stack, restart — not in the implementation. The frustration with catching an error only to throw another one is a layering point, not a reason to abandon signals.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#s7-classes-are-closures",
+    "href": "lab.html#s7-classes-are-closures",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.6 S7 classes are closures",
+    "text": "A.6 S7 classes are closures\nS7::class_any inspected as a length-zero VECSXP with class S7_any. Not a class constructor. S7::new_class(\"myclass\") inspected as a CLOSXP with attributes for the class metadata, a body that calls S7::new_object, and a parent whose body was already a BCODESXP inside the S7 namespace. typeof of the class object is \"closure\".\nThat dump is also where byte code, language objects, and the Nil formal list show up without anyone asking for them. A compiled package function contains a BCODESXP. A call in the body is a LANGSXP. An empty formal list is Nil. “Types you never see” are types you see the moment the value you asked about is implemented with them.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#r6-generators-are-environments",
+    "href": "lab.html#r6-generators-are-environments",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.7 R6 generators are environments",
+    "text": "A.7 R6 generators are environments\ntypeof(R6::R6Class()) is \"environment\". The inspect paste is long because the generator is an environment full of closures, and the clone method’s body is a program that allocates more environments, remaps function enclosures, locks them, and registers a finalizer for $finalize. The symbol &lt;&lt;- appears inside that generated code. So does .__enclos_env__. The class attribute on the generator is R6ClassGenerator.\nThis is the Scheme object, written out by a code generator. It is also a practical demonstration that &lt;&lt;- is not foreign to serious R. R6 uses superassignment inside a known enclosure, the object environment it just built. That is the declared version. The fragile version is the one where the enclosure is whatever happened to call you. Seeing both in the same afternoon is how the distinction becomes obvious.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#weak-references",
+    "href": "lab.html#weak-references",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.8 Weak references",
+    "text": "A.8 Weak references\nrlang::new_weakref(new.env(parent = emptyenv()), value = \"x\") has typeof \"weakref\" and inspects as type 23, WEAKREFSXP. The comment asked whether this is only an rlang convention. The type is a runtime type. The comfortable constructor is a package. reg.finalizer is what base gives you for the adjacent problem. Chapter 6 puts external pointers next to weak references so the two stop sharing a single vague reputation.\nThe same stretch of the file quotes the internals manual on a fossil: “user databases,” apparently the old Omegahat RObjectTables package, an undocumented lookup hook. It is a good reminder that the manual still contains archaeology. Read it next to the source when a sentence seems to describe a feature you have never seen. Sometimes the feature is real and hidden. Sometimes it is a scar.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#the-question-the-dumps-were-heading-toward",
+    "href": "lab.html#the-question-the-dumps-were-heading-toward",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.9 The question the dumps were heading toward",
+    "text": "A.9 The question the dumps were heading toward\nThe file then states the design question cleanly. Reference semantics make in-place change observable, which is what you want for invalidation, caches, and anything reactive. Values plus replacement functions can imitate some of that, at the cost of a new object. Low-level facts do not design a package by themselves. They tell you which promises the package is allowed to make. The rest of the file is an S7 experiment that takes the promise seriously.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#an-s7-assignment-changes-the-address",
+    "href": "lab.html#an-s7-assignment-changes-the-address",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.10 An S7 assignment changes the address",
+    "text": "A.10 An S7 assignment changes the address\ns_x was defined with a single class_any property. The class object was a CLOSXP. An instance was created. lobstr::obj_addr was recorded. my_x@p &lt;- \"aaa\" was evaluated. The address changed. The new node was an OBJSXP with OBJ and ATT, class c(\"s_x\", \"S7_object\"), a pointer back at the class, and a property record whose visible names included name, class, getter, setter, and validator.\nThat is the value illusion, holding, for a class system that people sometimes describe as “more OO” and therefore somehow reference-like. The replacement syntax looks like mutation. The address says a new value was born. R6 would have kept the address. The two dumps together are the fork in Chapter 5 and Chapter 11, obtained before any of those chapters were written.\nThe property record is the other souvenir. The slots for a strict property were present and, in this definition, empty. Chapter 12 hangs the authoring argument on that observation. The docs can show class_any. The node still has a place to put a validator. The next person who defines p gets to decide whether the place stays empty.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "lab.html#what-to-rerun",
+    "href": "lab.html#what-to-rerun",
+    "title": "Appendix A — Lab Notebook",
+    "section": "A.11 What to rerun",
+    "text": "A.11 What to rerun\nWhen a R release moves, the probes worth repeating are the ones the verification script already pins, plus three that need a human eye:\n\ninspect(1:1e9) and see whether you are looking at an ALTREP node rather than a billion integers\nlobstr::ref before and after x[1] &lt;- on a shared vector, and watch the count force a copy\na withCallingHandlers / withRestarts pair small enough to feel the stack stay alive, next to a tryCatch that unwinds it\n\nThe script in verification/ guards the claims that should not drift: Nil’s identity with c() and pairlist(), the independence of list(), the types of the typed empties, the factor representation, and builtin versus special. If one of those fails, the book is describing a different R than the one you have, and the book loses.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>A</span>  <span class='chapter-title'>Lab Notebook</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html",
+    "href": "open-questions.html",
+    "title": "Appendix B — Open Questions",
+    "section": "",
+    "text": "B.1 The symbol gp bits\nA reading gets to live in a chapter when a manual, the source, or a probe supports it. These are the ones that do not clear that bar yet. They are recorded so the chapters do not quietly upgrade them into mechanisms.\nInspect lines for symbols in the original session carried gp values such as 0x4000, 0x5000, 0x6000, 0x7000, and 0x8000, often next to LCK and “(has value)”. CHARSXP lines carried smaller values such as 0x60 and 0x61, and inspect already translated the part a human needs (ASCII, cached). The general-purpose field is sixteen bits whose meaning depends on the type. The CHARSXP encoding section covers one dialect. The symbol dialect lives in the source, and this book does not publish a decoded table it has not checked bit by bit against that source.\nWhat would close it: a short comment in src/main/inspect.c or the symbol macros in the headers, quoted next to one fresh dump, for the current R.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#does-inspect-suppress-ref0",
+    "href": "open-questions.html#does-inspect-suppress-ref0",
+    "title": "Appendix B — Open Questions",
+    "section": "B.2 Does inspect suppress REF(0)?",
+    "text": "B.2 Does inspect suppress REF(0)?\nEmpty vectors in the session printed an empty bracket. Saturated and shared nodes printed REF(n). The reading in Chapter 2 is that a missing token means “nothing worth printing,” not “this node has no count field.” The field exists either way: under the reference-counting build it is the 16-bit named slot.\nWhat would close it: the Rprintf in do_inspect that emits REF(%d). If it is guarded by a non-zero test, the reading becomes a mechanism. Until then, do not write code that infers a zero count from the absence of the token.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#the-sixth-name-on-an-s7_property",
+    "href": "open-questions.html#the-sixth-name-on-an-s7_property",
+    "title": "Appendix B — Open Questions",
+    "section": "B.3 The sixth name on an S7_property",
+    "text": "B.3 The sixth name on an S7_property\nA property built as class_any inspected as a length-6 record. The paste showed name, class, getter, setter, and validator, and elided the last name. Chapter 12 refuses to guess it. The argument does not depend on the sixth name. The five that are visible already include the slots a strict property would fill.\nWhat would close it: S7:::prop_names() or the constructor in the S7 sources for the installed version, plus one inspect that does not elide.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#does-s7-pin-the-class-at-refcntmax",
+    "href": "open-questions.html#does-s7-pin-the-class-at-refcntmax",
+    "title": "Appendix B — Open Questions",
+    "section": "B.4 Does S7 pin the class at REFCNTMAX?",
+    "text": "B.4 Does S7 pin the class at REFCNTMAX?\nBefore the replacement, the class closure in the session had a finite REF. Inside the instance dump after @p &lt;-, the class node appeared saturated. That can happen because many holders exist (the instance, the binding, the IDE, internal caches) or because something called MARK_NOT_MUTABLE. Saturation is a one-way door in the macros: once the count hits the ceiling, decrement will not bring it back. Treating “S7 classes are immortal” as a mechanism would be an overread of one dump.\nWhat would close it: a quiet session, lobstr::ref on the class before and after instantiation, and a look at whether S7 sets the count on purpose.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#base-level-constructors-for-weak-references",
+    "href": "open-questions.html#base-level-constructors-for-weak-references",
+    "title": "Appendix B — Open Questions",
+    "section": "B.5 Base-level constructors for weak references",
+    "text": "B.5 Base-level constructors for weak references\nThe session reached for rlang::new_weakref and got a real WEAKREFSXP. reg.finalizer is base. A user-facing weak-map constructor in base, of the same shape as rlang’s, was not part of the session and is not claimed here. The distinction between “the runtime has the type” and “the standard library hands it to you” is the point of that section. A future base function would narrow the gap without changing the type.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#n-and-altrep-on-this-r",
+    "href": "open-questions.html#n-and-altrep-on-this-r",
+    "title": "Appendix B — Open Questions",
+    "section": "B.6 1:n and ALTREP, on this R",
+    "text": "B.6 1:n and ALTREP, on this R\nThe design of ALTREP is documented. The session that seeded this book did not paste inspect(1:1e9). Whether a given R build still represents that sequence compactly, and how inspect spells the ALTREP class name, is a probe worth running and not a fact this text pretends to have run.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#user-databases",
+    "href": "open-questions.html#user-databases",
+    "title": "Appendix B — Open Questions",
+    "section": "B.7 User databases",
+    "text": "B.7 User databases\nR Internals on environments still mentions “user databases” and points, a bit sheepishly, at the former Omegahat package RObjectTables. The manual calls the hook under-documented. Treat it as archaeology until you have a current C caller. It is not a third environment model you should design a package around.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#two-powershell-docs-one-introduction-date",
+    "href": "open-questions.html#two-powershell-docs-one-introduction-date",
+    "title": "Appendix B — Open Questions",
+    "section": "B.8 Two PowerShell docs, one introduction date",
+    "text": "B.8 Two PowerShell docs, one introduction date\nabout_Output_Streams and about_Redirection agree on the stream numbers and disagree, in places, about which PowerShell version introduced warning, verbose, and debug as redirectable streams. This book uses the numbers and the roles, which agree, and does not adjudicate the version history.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "open-questions.html#what-would-change-a-recommendation",
+    "href": "open-questions.html#what-would-change-a-recommendation",
+    "title": "Appendix B — Open Questions",
+    "section": "B.9 What would change a recommendation",
+    "text": "B.9 What would change a recommendation\nThe container split (value for facts, handle for capabilities) would weaken if ordinary S7 replacement stopped changing object identity, or if environments grew copy-on-modify of their bindings. Neither is likely. The recommendation to fill S7 property slots instead of checking in methods would weaken if property validators stopped running on replacement. The S7 design notes keep a ledger of that kind of version-sensitive mechanic; defer to it for S7 behavior, and re-check after a major S7 release.\nThe recommendation to prefer calling handlers over tryCatch would not survive a problem whose correct policy is always “this attempt is over.” It is a default, not a law. The law is that the choice should be made on purpose, in one place, with a class a caller can see.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>B</span>  <span class='chapter-title'>Open Questions</span>"
+    ]
+  },
+  {
+    "objectID": "glossary.html",
+    "href": "glossary.html",
+    "title": "Appendix C — Glossary",
+    "section": "",
+    "text": "Terms for the distinctions this book keeps needing. Each one points at the chapter that gives it a home. Popups in the text use the same definitions.\n\nALTREP\n\nA framework for giving an ordinary SEXPTYPE a different payload: a compact sequence, a deferred string, a mapped vector, a cached answer to “are you sorted?” See the value illusion.\n\nCondition\n\nA classed signal. Handlers can run while the stack is still live, or they can unwind. See signals.\n\nCons cell\n\nA heap node with a head (CAR), a tail (CDR), and an optional name (TAG). Pairlists and calls are chains of them, ending at Nil. See cons and vectors.\n\nCopy-on-modify\n\nThe rule that a shared ordinary vector is duplicated before a write, so other names keep the old value. See the value illusion.\n\nFunctional core\n\nThe part of a program that decides on values. The imperative shell around it is where effects, handles, and hosts live. See where state lives.\n\nGeneric vector\n\nR’s user-facing list. One header plus a contiguous array of SEXP pointers. Type VECSXP. See three empties and cons and vectors.\n\nImmortal\n\nA node the collector must not free and the mutator must not modify. The reference count is pinned at REFCNTMAX, 65535. Nil is the canonical case. See the header.\n\nOpen verb\n\nAn operation that lives outside the type, so new nouns can join it and new verbs can be taught to old nouns. See open verbs.\n\nPromise\n\nA delayed argument: an expression, an environment, and eventually a value. Forced at most once. See the value illusion.\n\nReference owner\n\nAn object whose identity is part of the API. Aliases observe the same evolving state. See where state lives.\n\nRestart\n\nA named way to resume from a condition at the point where it was signaled, if someone established one. See signals.\n\nUbiquitous language\n\nThe curated names of a domain, shared by the code, the console, and the people working in it. See the law and data drives the design.\n\nValue illusion\n\nThe public story that ordinary R objects behave as values, sustained by sharing, reference counts, delayed copies, and sometimes by never allocating the payload at all. See the value illusion.\n\nView\n\nHow a value is shown. A separate contract from what the value is. See shown on purpose.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>C</span>  <span class='chapter-title'>Glossary</span>"
+    ]
+  },
+  {
+    "objectID": "sources.html",
+    "href": "sources.html",
+    "title": "Appendix D — Sources",
+    "section": "",
+    "text": "D.1 The runtime, primary\nThe chapters link out at the point of use. This is the same shelf, grouped so you can see what kind of document each one is. Manuals beat blog posts. Source beats manuals when they disagree. Papers beat this book’s readings of the papers.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>D</span>  <span class='chapter-title'>Sources</span>"
+    ]
+  },
+  {
+    "objectID": "sources.html#the-runtime-primary",
+    "href": "sources.html#the-runtime-primary",
+    "title": "Appendix D — Sources",
+    "section": "",
+    "text": "R Internals, for R 4.6.1 (2026-06-24). SEXPTYPEs, the header, allocation classes, environments, attributes, special primitives, the character cache. The manual warns that it is a work in progress. Believe it, and check the source when a sentence is load-bearing.\nThe R Language Definition. The C-syntax / Lisp-and-APL-semantics paragraph, and the chapter on computing on the language.\nsrc/main/memory.c in the wch/r-source mirror. Nil’s initialization, node classes, the generational heap. The comment “or armageddon happens” is not a joke you need to improve on.\nsrc/include/Defn.h. REFCNTMAX, MARK_NOT_MUTABLE, the increment and decrement macros that refuse to move a saturated count.\nLuke Tierney, Notes on Reference Counting in R. The design note from when reference counting was still opt-in. Read it for motivation and for the list of holders that deliberately do not count. Do not read it as a description of the compile flags in a current release. Current dumps print REF(n) because the switch happened.\nLuke Tierney, Gabe Becker, and Tomas Kalibera, ALTREP: Alternative Representations for R Objects. The design note. The 2017 DSC slides circulate as a PDF; the tech-doc index is developer.r-project.org/TechDocs.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>D</span>  <span class='chapter-title'>Sources</span>"
+    ]
+  },
+  {
+    "objectID": "sources.html#the-language-primary",
+    "href": "sources.html#the-language-primary",
+    "title": "Appendix D — Sources",
+    "section": "D.2 The language, primary",
+    "text": "D.2 The language, primary\n\nJohn M. Chambers, S, R, and Data Science, The R Journal 12/1 (2020). The three principles, in his wording, with the 1976 blackboard and the reason there are no scalars. The book he points at is Extending R (Chapman and Hall/CRC, 2016), pages 4–11.\nRoss Ihaka and Robert Gentleman, R: A Language for Data Analysis and Graphics, Journal of Computational and Graphical Statistics 5/3 (1996).\nFloréal Morandat, Brandon Hill, Leo Osvald, and Jan Vitek, Evaluating the Design of the R Language, ECOOP 2012.\nHadley Wickham, Advanced R, 2nd ed., 2019. In particular names and values, environments, object systems, and conditions.\nHadley Wickham, A Layered Grammar of Graphics, Journal of Computational and Graphical Statistics 19/1 (2010). Wilkinson’s Grammar of Graphics (Springer, 2005) is the prior vocabulary.\nhttr2, ellmer, cli, and rlang::try_fetch().\nThe companion design manual: S7 Design Notes.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>D</span>  <span class='chapter-title'>Sources</span>"
+    ]
+  },
+  {
+    "objectID": "sources.html#conditions-types-and-shells",
+    "href": "sources.html#conditions-types-and-shells",
+    "title": "Appendix D — Sources",
+    "section": "D.3 Conditions, types, and shells",
+    "text": "D.3 Conditions, types, and shells\n\nKent M. Pitman, Condition Handling in the Lisp Language Family (2001). The Common Lisp mechanism itself is HyperSpec chapter 9.\nAlexis King, Parse, don’t validate (2019).\nJohn Launchbury and Simon Peyton Jones, “Lazy Functional State Threads,” POPL 1994. The paper behind runST. Microsoft Research hosts the publication.\nGary Bernhardt, Boundaries. Functional core, imperative shell. The talk is the source of the phrase as used here.\nEric Evans, Domain-Driven Design (Addison-Wesley, 2003). Ubiquitous language. The enterprise apparatus is optional; the vocabulary is not.\nThe Rust book, chapter on traits and the Rust API guidelines. Read these before repeating the “R is just like Rust” line to someone who writes Rust. The shared posture is open operations over types. The ownership story does not transfer.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>D</span>  <span class='chapter-title'>Sources</span>"
+    ]
+  },
+  {
+    "objectID": "sources.html#powershell-and-the-view-layer",
+    "href": "sources.html#powershell-and-the-view-layer",
+    "title": "Appendix D — Sources",
+    "section": "D.4 PowerShell and the view layer",
+    "text": "D.4 PowerShell and the view layer\n\nJeffrey P. Snover, the Monad manifesto, 8 August 2002. Microsoft Learn hosts it; the PDF is the text. “Instead of piping unstructured text, we pipe .NET objects.”\nabout_Output_Streams and about_Redirection. Stream numbers. See the open question on the version-introduced discrepancy before you cite a year.\nabout_Format.ps1xml. Views affect display only. Built-in views moved into source in PowerShell 6. The separation is the idea; the XML is the aged vehicle.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>D</span>  <span class='chapter-title'>Sources</span>"
+    ]
+  },
+  {
+    "objectID": "sources.html#what-not-to-cite-this-book-for",
+    "href": "sources.html#what-not-to-cite-this-book-for",
+    "title": "Appendix D — Sources",
+    "section": "D.5 What not to cite this book for",
+    "text": "D.5 What not to cite this book for\nDo not cite it for a guarantee about a future R, or for S7 behavior past what the S7 design notes have rechecked. Do not cite the Cairo / WinFS paragraph as a history of .NET; it is a warning against a bad history. Do not cite a REF count from an IDE session as a property of an expression. Cite the manuals, the source, and the probes in verification/ for anything that has to survive contact with a different machine.",
+    "crumbs": [
+      "Appendices",
+      "<span class='chapter-number'>D</span>  <span class='chapter-title'>Sources</span>"
+    ]
+  }
+]
