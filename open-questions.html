@@ -461,14 +461,13 @@ ul.task-list li input[type="checkbox"] {
    
   <ul>
   <li><a href="#the-symbol-gp-bits" id="toc-the-symbol-gp-bits" class="nav-link active" data-scroll-target="#the-symbol-gp-bits"><span class="header-section-number">B.1</span> The symbol <code>gp</code> bits</a></li>
-  <li><a href="#does-inspect-suppress-ref0" id="toc-does-inspect-suppress-ref0" class="nav-link" data-scroll-target="#does-inspect-suppress-ref0"><span class="header-section-number">B.2</span> Does inspect suppress <code>REF(0)</code>?</a></li>
-  <li><a href="#the-sixth-name-on-an-s7_property" id="toc-the-sixth-name-on-an-s7_property" class="nav-link" data-scroll-target="#the-sixth-name-on-an-s7_property"><span class="header-section-number">B.3</span> The sixth name on an <code>S7_property</code></a></li>
-  <li><a href="#does-s7-pin-the-class-at-refcntmax" id="toc-does-s7-pin-the-class-at-refcntmax" class="nav-link" data-scroll-target="#does-s7-pin-the-class-at-refcntmax"><span class="header-section-number">B.4</span> Does S7 pin the class at <code>REFCNTMAX</code>?</a></li>
-  <li><a href="#base-level-constructors-for-weak-references" id="toc-base-level-constructors-for-weak-references" class="nav-link" data-scroll-target="#base-level-constructors-for-weak-references"><span class="header-section-number">B.5</span> Base-level constructors for weak references</a></li>
-  <li><a href="#n-and-altrep-on-this-r" id="toc-n-and-altrep-on-this-r" class="nav-link" data-scroll-target="#n-and-altrep-on-this-r"><span class="header-section-number">B.6</span> <code>1:n</code> and ALTREP, on this R</a></li>
-  <li><a href="#user-databases" id="toc-user-databases" class="nav-link" data-scroll-target="#user-databases"><span class="header-section-number">B.7</span> User databases</a></li>
-  <li><a href="#two-powershell-docs-one-introduction-date" id="toc-two-powershell-docs-one-introduction-date" class="nav-link" data-scroll-target="#two-powershell-docs-one-introduction-date"><span class="header-section-number">B.8</span> Two PowerShell docs, one introduction date</a></li>
-  <li><a href="#what-would-change-a-recommendation" id="toc-what-would-change-a-recommendation" class="nav-link" data-scroll-target="#what-would-change-a-recommendation"><span class="header-section-number">B.9</span> What would change a recommendation</a></li>
+  <li><a href="#the-sixth-name-on-an-s7_property" id="toc-the-sixth-name-on-an-s7_property" class="nav-link" data-scroll-target="#the-sixth-name-on-an-s7_property"><span class="header-section-number">B.2</span> The sixth name on an <code>S7_property</code></a></li>
+  <li><a href="#does-s7-pin-the-class-at-refcntmax" id="toc-does-s7-pin-the-class-at-refcntmax" class="nav-link" data-scroll-target="#does-s7-pin-the-class-at-refcntmax"><span class="header-section-number">B.3</span> Does S7 pin the class at <code>REFCNTMAX</code>?</a></li>
+  <li><a href="#base-level-constructors-for-weak-references" id="toc-base-level-constructors-for-weak-references" class="nav-link" data-scroll-target="#base-level-constructors-for-weak-references"><span class="header-section-number">B.4</span> Base-level constructors for weak references</a></li>
+  <li><a href="#n-and-altrep-on-this-r" id="toc-n-and-altrep-on-this-r" class="nav-link" data-scroll-target="#n-and-altrep-on-this-r"><span class="header-section-number">B.5</span> <code>1:n</code> and ALTREP, on this R</a></li>
+  <li><a href="#user-databases" id="toc-user-databases" class="nav-link" data-scroll-target="#user-databases"><span class="header-section-number">B.6</span> User databases</a></li>
+  <li><a href="#two-powershell-docs-one-introduction-date" id="toc-two-powershell-docs-one-introduction-date" class="nav-link" data-scroll-target="#two-powershell-docs-one-introduction-date"><span class="header-section-number">B.7</span> Two PowerShell docs, one introduction date</a></li>
+  <li><a href="#what-would-change-a-recommendation" id="toc-what-would-change-a-recommendation" class="nav-link" data-scroll-target="#what-would-change-a-recommendation"><span class="header-section-number">B.8</span> What would change a recommendation</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/jimbrig/the-value-illusion/edit/main/open-questions.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/jimbrig/the-value-illusion/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div></nav>
     </div>
@@ -501,39 +500,34 @@ ul.task-list li input[type="checkbox"] {
 <p>Inspect lines for symbols in the original session carried <code>gp</code> values such as <code>0x4000</code>, <code>0x5000</code>, <code>0x6000</code>, <code>0x7000</code>, and <code>0x8000</code>, often next to <code>LCK</code> and “(has value)”. <code>CHARSXP</code> lines carried smaller values such as <code>0x60</code> and <code>0x61</code>, and inspect already translated the part a human needs (<code>ASCII</code>, <code>cached</code>). The general-purpose field is sixteen bits whose meaning depends on the type. The <a href="https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Encodings-for-CHARSXPs">CHARSXP encoding section</a> covers one dialect. The symbol dialect lives in the source, and this book does not publish a decoded table it has not checked bit by bit against that source.</p>
 <p>What would close it: a short comment in <code>src/main/inspect.c</code> or the symbol macros in the headers, quoted next to one fresh dump, for the current R.</p>
 </section>
-<section id="does-inspect-suppress-ref0" class="level2" data-number="B.2">
-<h2 data-number="B.2" class="anchored" data-anchor-id="does-inspect-suppress-ref0"><span class="header-section-number">B.2</span> Does inspect suppress <code>REF(0)</code>?</h2>
-<p>Empty vectors in the session printed an empty bracket. Saturated and shared nodes printed <code>REF(n)</code>. The reading in <a href="01-header.html" class="quarto-xref"><span>Chapter 2</span></a> is that a missing token means “nothing worth printing,” not “this node has no count field.” The field exists either way: under the reference-counting build it is the 16-bit <code>named</code> slot.</p>
-<p>What would close it: the <code>Rprintf</code> in <code>do_inspect</code> that emits <code>REF(%d)</code>. If it is guarded by a non-zero test, the reading becomes a mechanism. Until then, do not write code that infers a zero count from the absence of the token.</p>
-</section>
-<section id="the-sixth-name-on-an-s7_property" class="level2" data-number="B.3">
-<h2 data-number="B.3" class="anchored" data-anchor-id="the-sixth-name-on-an-s7_property"><span class="header-section-number">B.3</span> The sixth name on an <code>S7_property</code></h2>
+<section id="the-sixth-name-on-an-s7_property" class="level2" data-number="B.2">
+<h2 data-number="B.2" class="anchored" data-anchor-id="the-sixth-name-on-an-s7_property"><span class="header-section-number">B.2</span> The sixth name on an <code>S7_property</code></h2>
 <p>A property built as <code>class_any</code> inspected as a length-6 record. The paste showed <code>name</code>, <code>class</code>, <code>getter</code>, <code>setter</code>, and <code>validator</code>, and elided the last name. <a href="11-types.html" class="quarto-xref"><span>Chapter 12</span></a> refuses to guess it. The argument does not depend on the sixth name. The five that are visible already include the slots a strict property would fill.</p>
 <p>What would close it: <code>S7:::prop_names()</code> or the constructor in the S7 sources for the installed version, plus one inspect that does not elide.</p>
 </section>
-<section id="does-s7-pin-the-class-at-refcntmax" class="level2" data-number="B.4">
-<h2 data-number="B.4" class="anchored" data-anchor-id="does-s7-pin-the-class-at-refcntmax"><span class="header-section-number">B.4</span> Does S7 pin the class at <code>REFCNTMAX</code>?</h2>
+<section id="does-s7-pin-the-class-at-refcntmax" class="level2" data-number="B.3">
+<h2 data-number="B.3" class="anchored" data-anchor-id="does-s7-pin-the-class-at-refcntmax"><span class="header-section-number">B.3</span> Does S7 pin the class at <code>REFCNTMAX</code>?</h2>
 <p>Before the replacement, the class closure in the session had a finite <code>REF</code>. Inside the instance dump after <code>@p &lt;-</code>, the class node appeared saturated. That can happen because many holders exist (the instance, the binding, the IDE, internal caches) or because something called <code>MARK_NOT_MUTABLE</code>. Saturation is a one-way door in the macros: once the count hits the ceiling, decrement will not bring it back. Treating “S7 classes are immortal” as a mechanism would be an overread of one dump.</p>
 <p>What would close it: a quiet session, <code>lobstr::ref</code> on the class before and after instantiation, and a look at whether S7 sets the count on purpose.</p>
 </section>
-<section id="base-level-constructors-for-weak-references" class="level2" data-number="B.5">
-<h2 data-number="B.5" class="anchored" data-anchor-id="base-level-constructors-for-weak-references"><span class="header-section-number">B.5</span> Base-level constructors for weak references</h2>
+<section id="base-level-constructors-for-weak-references" class="level2" data-number="B.4">
+<h2 data-number="B.4" class="anchored" data-anchor-id="base-level-constructors-for-weak-references"><span class="header-section-number">B.4</span> Base-level constructors for weak references</h2>
 <p>The session reached for <code>rlang::new_weakref</code> and got a real <code>WEAKREFSXP</code>. <code>reg.finalizer</code> is base. A user-facing weak-map constructor in base, of the same shape as rlang’s, was not part of the session and is not claimed here. The distinction between “the runtime has the type” and “the standard library hands it to you” is the point of that section. A future base function would narrow the gap without changing the type.</p>
 </section>
-<section id="n-and-altrep-on-this-r" class="level2" data-number="B.6">
-<h2 data-number="B.6" class="anchored" data-anchor-id="n-and-altrep-on-this-r"><span class="header-section-number">B.6</span> <code>1:n</code> and ALTREP, on this R</h2>
+<section id="n-and-altrep-on-this-r" class="level2" data-number="B.5">
+<h2 data-number="B.5" class="anchored" data-anchor-id="n-and-altrep-on-this-r"><span class="header-section-number">B.5</span> <code>1:n</code> and ALTREP, on this R</h2>
 <p>The design of ALTREP is documented. The session that seeded this book did not paste <code>inspect(1:1e9)</code>. Whether a given R build still represents that sequence compactly, and how inspect spells the ALTREP class name, is a probe worth running and not a fact this text pretends to have run.</p>
 </section>
-<section id="user-databases" class="level2" data-number="B.7">
-<h2 data-number="B.7" class="anchored" data-anchor-id="user-databases"><span class="header-section-number">B.7</span> User databases</h2>
+<section id="user-databases" class="level2" data-number="B.6">
+<h2 data-number="B.6" class="anchored" data-anchor-id="user-databases"><span class="header-section-number">B.6</span> User databases</h2>
 <p><a href="https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Environments-and-variable-lookup">R Internals on environments</a> still mentions “user databases” and points, a bit sheepishly, at the former Omegahat package <code>RObjectTables</code>. The manual calls the hook under-documented. Treat it as archaeology until you have a current C caller. It is not a third environment model you should design a package around.</p>
 </section>
-<section id="two-powershell-docs-one-introduction-date" class="level2" data-number="B.8">
-<h2 data-number="B.8" class="anchored" data-anchor-id="two-powershell-docs-one-introduction-date"><span class="header-section-number">B.8</span> Two PowerShell docs, one introduction date</h2>
+<section id="two-powershell-docs-one-introduction-date" class="level2" data-number="B.7">
+<h2 data-number="B.7" class="anchored" data-anchor-id="two-powershell-docs-one-introduction-date"><span class="header-section-number">B.7</span> Two PowerShell docs, one introduction date</h2>
 <p><a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_output_streams">about_Output_Streams</a> and <a href="https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection">about_Redirection</a> agree on the stream numbers and disagree, in places, about which PowerShell version introduced warning, verbose, and debug as redirectable streams. This book uses the numbers and the roles, which agree, and does not adjudicate the version history.</p>
 </section>
-<section id="what-would-change-a-recommendation" class="level2" data-number="B.9">
-<h2 data-number="B.9" class="anchored" data-anchor-id="what-would-change-a-recommendation"><span class="header-section-number">B.9</span> What would change a recommendation</h2>
+<section id="what-would-change-a-recommendation" class="level2" data-number="B.8">
+<h2 data-number="B.8" class="anchored" data-anchor-id="what-would-change-a-recommendation"><span class="header-section-number">B.8</span> What would change a recommendation</h2>
 <p>The container split (value for facts, handle for capabilities) would weaken if ordinary S7 replacement stopped changing object identity, or if environments grew copy-on-modify of their bindings. Neither is likely. The recommendation to fill S7 property slots instead of checking in methods would weaken if property validators stopped running on replacement. The S7 design notes keep a ledger of that kind of version-sensitive mechanic; defer to it for S7 behavior, and re-check after a major S7 release.</p>
 <p>The recommendation to prefer calling handlers over <code>tryCatch</code> would not survive a problem whose correct policy is always “this attempt is over.” It is a default, not a law. The law is that the choice should be made on purpose, in one place, with a class a caller can see.</p>
 
