@@ -77,15 +77,14 @@ The generation and the class are neighbors in the printout and unrelated
 in the header.
 
 `gcgen` is one bit. Inspect prints it as `g0` or `g1`. It will never print
-`g2`. The collector itself is richer than the bit: `memory.c` keeps a
-nursery plus old generations (`NUM_OLD_GENERATIONS` is 2, and the comment
-next to it says the header bit is why you cannot have more than that).
-What you can actually see is the bit. In a live session, freshly allocated
-nodes tend to show `g0`. The nodes that have been around since startup ---
-`R_NilValue`, locked symbols, cached `CHARSXP`s --- show `g1`. Treat `g1`
-as "this has survived, or was born old." Treat a blog post that decodes
-`g0c1` as "generation 0 of 3, size class 1 of a vague scale" as out of
-date.
+`g2`. The collector behind that bit is a young space plus two old
+generations (`NUM_OLD_GENERATIONS` is 2), and `gc()` walks three
+collection levels. A node in the young space and a node in old generation
+0 can both print `g0`, so the digit is not a synonym for "just allocated."
+Long-lived startup nodes --- `R_NilValue`, locked symbols, cached
+`CHARSXP`s --- print `g1` in practice. That is a tendency in the dumps,
+not a definition of the bit. Treat a blog post that decodes `g0c1` as
+"generation 0 of 3, size class 1 of a vague scale" as out of date.
 
 `gccls` is three bits, so eight allocation classes. The manual's
 [allocation-class section](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#Allocation-classes)
@@ -179,10 +178,13 @@ The same binding can print `REF(1)` in a quiet console and a much larger
 number under RStudio, because RStudio is a holder. The count is a census
 of current pointers. It is not a property of the source literal.
 
-A fresh empty vector in those dumps printed an empty bracket, `[]`. A node
-with a positive count printed `REF(n)`. Read a missing `REF` as "no
-tracked holders worth printing," and then go look at `inspect.c` before
-you build a theory on the absence. The field still exists.
+`do_inspect` prints `REF(n)` only when the count is nonzero. The test in
+`src/main/inspect.c` is `if (REFCNT(v))`. A fresh unshared vector with no
+other flags therefore shows an empty bracket, `[]`, which is what the
+empty vectors in the session did. The field is still there, and it is
+zero. On a normal build you will not see the old `NAM(n)` token at all.
+That spelling belongs to the legacy `NAMED` compile, not to the
+reference-counting one you are running.
 
 ## Where `inspect` sits
 

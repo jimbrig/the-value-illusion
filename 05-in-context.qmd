@@ -39,13 +39,15 @@ node you already have, and hang the dictionary off the side.
 Two different words got called "object," and the confusion is reasonable.
 
 `is.object(x)` answers the `OBJ` bit, which the header comment defines as
-"does this have a class attribute?" A factor is an `INTSXP` with a
-`levels` attribute and `class = "factor"`. The bit is set. `typeof` stays
-`"integer"`. `OBJSXP` is a different question: type code 25, the node
-shape used for S4 objects and for S7 instances, which do not consist
-solely of a simple vector or function. The manual says so directly. The
-notebook's S7 instance, after `@p <- "aaa"`, is type 25. The factor never
-was.
+"does this have a class attribute?" Adding a class sets the bit. Removing
+the class clears it. A factor is an `INTSXP` with a `levels` attribute and
+`class = "factor"`. The bit is set. `typeof` stays `"integer"`. `OBJSXP`
+is a different question: type code 25, the node used when an S4 or S7
+object is not itself a simple vector or function. An S4 object that
+*does* carry vector data keeps that vector's `SEXPTYPE` and sets a
+separate S4 bit in `gp`. `isS4()` reads that bit. It does not ask whether
+the type code is 25. The notebook's S7 instance, after `@p <- "aaa"`, is
+type 25. The factor never was.
 
 Factors feel "more low-level" because base R and the C API know them
 intimately: modeling code, tabulation, printing, `levels<-` as a

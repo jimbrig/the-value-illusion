@@ -72,9 +72,17 @@ The practical consequences, all visible from user level and spelled out in
   yourself.
 
 Environments do not play this game. Assigning into an environment mutates
-the frame. The reference count still tells you how many names point at
-*that environment*. It does not trigger a duplicate-on-write of the
-bindings. An environment with `REF(11)` is a popular handle, not a value
+the frame. `duplicate1` in the runtime returns an environment unchanged,
+in the same group as Nil, symbols, external pointers, and weak references.
+The reference count still tells you how many names point at *that
+environment*. It does not trigger a duplicate-on-write of the bindings.
+Chambers says the contradiction on purpose, in
+[*S, R, and Data Science*](https://journal.r-project.org/articles/RJ-2020-028/):
+an environment is accessed by reference, "which deliberately contradicts
+the usual non-reference semantics of S," and the same computation "might
+have different results if that object was an environment on one hand or a
+list with the same elements corresponding to the same names on the other."
+That is the warning the dumps are a photograph of. An environment with `REF(11)` is a popular handle, not a value
 that is about to be copied for your safety. The global environment is
 saturated and locked because it is part of the process.
 

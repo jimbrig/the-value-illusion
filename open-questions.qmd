@@ -20,19 +20,6 @@ that source.
 What would close it: a short comment in `src/main/inspect.c` or the symbol
 macros in the headers, quoted next to one fresh dump, for the current R.
 
-## Does inspect suppress `REF(0)`?
-
-Empty vectors in the session printed an empty bracket. Saturated and
-shared nodes printed `REF(n)`. The reading in @sec-header is that a
-missing token means "nothing worth printing," not "this node has no count
-field." The field exists either way: under the reference-counting build
-it is the 16-bit `named` slot.
-
-What would close it: the `Rprintf` in `do_inspect` that emits `REF(%d)`.
-If it is guarded by a non-zero test, the reading becomes a mechanism. Until
-then, do not write code that infers a zero count from the absence of the
-token.
-
 ## The sixth name on an `S7_property`
 
 A property built as `class_any` inspected as a length-6 record. The paste

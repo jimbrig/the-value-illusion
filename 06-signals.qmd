@@ -42,9 +42,15 @@ the warning case continue. `tryCatch` on a warning is you replacing that
 policy with an unwind. Sometimes you want that. Often you wanted to
 muffle, collect, or re-signal.
 
-[Advanced R's conditions chapter](https://adv-r.hadley.nz/conditions.html)
-is the practical map, including the class hierarchy (`condition` →
-`error` / `warning` / `message`, and your subclasses under those).
+The R implementation of the split is older than the tidyverse wrappers.
+Robert Gentleman and Luke Tierney wrote
+[A Prototype of a Condition System for R](https://homepage.stat.uiowa.edu/~luke/R/exceptions/simpcond.html)
+and distinguished exiting handlers from calling handlers there. Advanced R's
+[conditions chapter](https://adv-r.hadley.nz/conditions.html) is the
+practical map, including the class hierarchy (`condition` → `error` /
+`warning` / `message`, and your subclasses under those). It also says,
+honestly, that restarts are out of its scope. The help pages for
+`withRestarts` and `tryCatch` are the reference for the base mechanism.
 [rlang::try_fetch()](https://rlang.r-lib.org/reference/try_fetch.html)
 is the current "handler that can return a value" spelling, and the `cnd_`
 constructors are how you build the objects without hand-rolled `structure()`

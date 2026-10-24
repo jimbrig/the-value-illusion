@@ -100,19 +100,24 @@ the preference. @sec-verbs is about paying it on purpose.
 A few comparisons, kept specific so they do not turn into team sports.
 
 **httr2.** A request is a value you build with a pipe of functions:
-URL, headers, body, authentication, then perform. The
+URL, headers, body, authentication, then perform. The help page calls it
+an S3 list of class `httr2_request`
+([`request()`](https://httr2.r-lib.org/reference/request.html)), and the
 [introductory vignette](https://httr2.r-lib.org/articles/httr2.html)
-shows the shape. Errors are classed. The perform step is the edge where
+shows the pipe. Errors are classed. The perform step is the edge where
 the value meets the network. This is the functional core and the
 imperative shell in one pipeline, and it is pleasant in a way
 object-graphs of HTTP clients often are not. You can see the request. You
 can print it before you send it. Printing is part of the design.
 
-**ellmer.** A conversation with a model is a session you hold, and the
-operations on it are a small vocabulary: send a turn, register a tool,
-extract a typed value. The
-[package site](https://ellmer.tidyverse.org/) is the reference. A
-conversation has identity --- turns accumulate --- so a handle is the
+**ellmer.** A conversation with a model is a session you hold. The chat
+objects are R6, which is the right physics: turns accumulate, so identity
+is the feature. The operations on that handle are a small vocabulary:
+send a turn, register a tool, extract a typed value. The
+[package site](https://ellmer.tidyverse.org/) is the reference, and it
+points retrieval at
+[ragnar](https://ragnar.tidyverse.org/) rather than pretending the chat
+object is a framework. A conversation has identity, so a handle is the
 honest representation. The design win over a large agent framework is the
 size of the vocabulary and the refusal to hide the request. Compare that
 with LangChain-style graphs when you want a lesson in what "more objects"

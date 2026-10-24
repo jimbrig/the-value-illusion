@@ -68,6 +68,10 @@ of the papers.
 
 ## Conditions, types, and shells
 
+- Robert Gentleman and Luke Tierney,
+  [A Prototype of a Condition System for R](https://homepage.stat.uiowa.edu/~luke/R/exceptions/simpcond.html).
+  Exiting handlers versus calling handlers, from the people who put the
+  mechanism in the language.
 - Kent M. Pitman,
   [Condition Handling in the Lisp Language Family](https://nhplace.com/kent/Papers/Condition-Handling-2001.html)
   (2001). The Common Lisp mechanism itself is
