@@ -527,7 +527,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <p>The first good hypothesis in the notebook was slightly too wide, and the next calls retired the extra width. That is the experiment working.</p>
-<p>The hypothesis, paraphrased from the comments: any genuinely empty thing is the same immortal <code>NILSXP</code> cell. <code>NULL</code>, <code>c()</code>, and <code>pairlist()</code> confirmed it, including under the strictest <code>identical()</code> switches, and including <code>extptr.as.ref = TRUE</code>. Same address. Same type code 0. <code>REF</code> pinned at the ceiling.</p>
+<p>The hypothesis, paraphrased from the comments: any genuinely empty thing is the same immortal <code>NILSXP</code> cell. <code>NULL</code>, <code>c()</code>, and <code>pairlist()</code> confirmed it, including under the strictest <code>identical()</code> switches. <code>extptr.as.ref = TRUE</code> does not add anything to that comparison: neither value is an external pointer, so the flag never gets a chance to matter. Same address. Same type code 0. <code>REF</code> pinned at the ceiling. <code>is.pairlist(NULL)</code> is true, because Nil is the empty pairlist. <code>is.list(NULL)</code> is false, because a list is a generic vector and Nil is not one.</p>
 <p>Then <code>list()</code> and <code>alist()</code> printed a different address, type 19, <code>VECSXP</code>, length 0, empty flag bracket. Then <code>integer()</code>, <code>character()</code>, <code>double()</code>, <code>logical()</code>, <code>complex()</code>, and <code>raw()</code> each printed a zero-length vector of their own type. The hypothesis that survived is sharper than the one that was written down first.</p>
 <table class="caption-top table">
 <colgroup>
@@ -593,8 +593,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>you can set <code>names</code> on it, grow it with <code>[[&lt;-</code>, and hand it to <code>lapply</code></li>
 <li>an empty list with no class is still not <code>NULL</code>, so the <code>OBJ</code> bit and the class attribute stay out of the explanation</li>
 </ul>
-<p>Pairlists follow the other rule because they are cons chains. The empty chain <em>is</em> nil. <code>pairlist()</code> with no arguments returns <code>R_NilValue</code>. R kept that rule for the substrate — formals, attributes, the tail of a call — and grew a different empty for analysts.</p>
-<p><code>alist()</code> is the subtle one. An alist is a list that can hold missing arguments; it is still a generic vector, not a pairlist. Empty, it is another zero-length <code>VECSXP</code>, at its own address. The name “alist” is historical. The representation is the vector world’s.</p>
+<p>Pairlists follow the other rule because they are cons chains. The empty chain <em>is</em> nil. On current R, <code>pairlist()</code> is an R function: <code>as.pairlist(list(...))</code>. <code>allocList(0)</code> returns <code>R_NilValue</code>, which is why the empty call is Nil rather than a zero-length cons node. R kept that rule for the substrate — formals, attributes, the tail of a call — and grew a different empty for analysts.</p>
+<p><code>alist()</code> is the subtle one. It is also an R function, <code>as.list(sys.call())[-1]</code>, so the arguments are not evaluated and the result is still a generic vector. Empty, it is another zero-length <code>VECSXP</code>, at its own address. The name “alist” is historical. The representation is the vector world’s.</p>
 </section>
 <section id="typed-emptiness-is-a-value" class="level2" data-number="3.3">
 <h2 data-number="3.3" class="anchored" data-anchor-id="typed-emptiness-is-a-value"><span class="header-section-number">3.3</span> Typed emptiness is a value</h2>
