@@ -107,7 +107,11 @@ and they answer different questions.
 An external pointer is how an R object owns a GDAL dataset, a database
 connection, a C++ instance. The R object is the handle you can name,
 protect, and finalize. The bytes live in someone else's allocator.
-`reg.finalizer` is the base-R hook for "run this when the node goes."
+`reg.finalizer` is the base-R hook. It registers a function to run after
+the key has been found unmarked, at a safe point following collection,
+once. It does not run at the instant the last binding disappears, and the
+help page is blunt that arbitrary R from a finalizer has already caused
+trouble. It accepts environments and external pointers, not lists.
 That is the interface principle from Chambers, made concrete: talking to
 other languages includes talking about their lifetimes.
 

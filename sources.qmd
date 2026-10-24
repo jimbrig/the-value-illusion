@@ -83,11 +83,14 @@ of the papers.
   POPL 1994. The paper behind `runST`.
   [Microsoft Research hosts the publication](https://www.microsoft.com/en-us/research/publication/lazy-functional-state-threads/).
 - Gary Bernhardt,
-  [Boundaries](https://www.destroyallsoftware.com/talks/boundaries).
-  Functional core, imperative shell. The talk is the source of the phrase
-  as used here.
+  [Boundaries](https://www.destroyallsoftware.com/talks/boundaries)
+  (SCNA 2012). The phrase "functional core, imperative shell" is his
+  screencast of that name, dated 2012-07-12:
+  [Functional Core, Imperative Shell](https://www.destroyallsoftware.com/screencasts/catalog/functional-core-imperative-shell).
 - Eric Evans, *Domain-Driven Design* (Addison-Wesley, 2003). Ubiquitous
-  language. The enterprise apparatus is optional; the vocabulary is not.
+  language: one shared vocabulary for the people and the model. Scaling
+  that habit down to a package is this book's recommendation, not a
+  sentence from the book.
 - [The Rust book, chapter on traits](https://doc.rust-lang.org/book/ch10-02-traits.html)
   and the [Rust API guidelines](https://rust-lang.github.io/api-guidelines/).
   Read these before repeating the "R is just like Rust" line to someone

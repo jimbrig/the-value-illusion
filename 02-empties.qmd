@@ -5,9 +5,12 @@ next calls retired the extra width. That is the experiment working.
 
 The hypothesis, paraphrased from the comments: any genuinely empty thing
 is the same immortal `NILSXP` cell. `NULL`, `c()`, and `pairlist()`
-confirmed it, including under the strictest `identical()` switches, and
-including `extptr.as.ref = TRUE`. Same address. Same type code 0. `REF`
-pinned at the ceiling.
+confirmed it, including under the strictest `identical()` switches.
+`extptr.as.ref = TRUE` does not add anything to that comparison: neither
+value is an external pointer, so the flag never gets a chance to matter.
+Same address. Same type code 0. `REF` pinned at the ceiling. `is.pairlist(NULL)`
+is true, because Nil is the empty pairlist. `is.list(NULL)` is false,
+because a list is a generic vector and Nil is not one.
 
 Then `list()` and `alist()` printed a different address, type 19,
 `VECSXP`, length 0, empty flag bracket. Then `integer()`, `character()`,
@@ -83,14 +86,16 @@ container:
   the class attribute stay out of the explanation
 
 Pairlists follow the other rule because they are cons chains. The empty
-chain *is* nil. `pairlist()` with no arguments returns `R_NilValue`. R
-kept that rule for the substrate --- formals, attributes, the tail of a
-call --- and grew a different empty for analysts.
+chain *is* nil. On current R, `pairlist()` is an R function:
+`as.pairlist(list(...))`. `allocList(0)` returns `R_NilValue`, which is
+why the empty call is Nil rather than a zero-length cons node. R kept
+that rule for the substrate --- formals, attributes, the tail of a call ---
+and grew a different empty for analysts.
 
-`alist()` is the subtle one. An alist is a list that can hold missing
-arguments; it is still a generic vector, not a pairlist. Empty, it is
-another zero-length `VECSXP`, at its own address. The name "alist" is
-historical. The representation is the vector world's.
+`alist()` is the subtle one. It is also an R function, `as.list(sys.call())[-1]`,
+so the arguments are not evaluated and the result is still a generic
+vector. Empty, it is another zero-length `VECSXP`, at its own address.
+The name "alist" is historical. The representation is the vector world's.
 
 ## Typed emptiness is a value
 

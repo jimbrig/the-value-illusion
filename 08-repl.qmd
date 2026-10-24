@@ -125,14 +125,16 @@ does to a domain that wanted a few verbs. The lesson is not that Python
 cannot be clear. It is that a framework can spend its complexity budget
 on the wrong axis.
 
-**ggplot2.** Wilkinson's *Grammar of Graphics* gave the field a
-vocabulary. Wickham's
-[layered grammar](https://doi.org/10.1198/jcgs.2009.07098) turned it into
-an embedded language of data, aesthetic mappings, geoms, stats, and
-facets. You can dislike using it and still recognize the move. A plot is
-a specification, a value, built by composing layers. It is not a scene
-graph you mutate. Formulas in modeling packages are the older version of
-the same move. R's frameworks, when they work, look like grammars.
+**ggplot2.** Wilkinson's *Grammar of Graphics* (Springer, 2005) gave the
+field a vocabulary. Wickham's
+[layered grammar](https://doi.org/10.1198/jcgs.2009.07098) is explicit
+that it is not that book unchanged: the components are arranged
+differently, the defaults differ, and the grammar is embedded in a
+programming language. You can dislike using ggplot2 and still recognize
+the move. A plot is a specification, a value, built by composing layers.
+It is not a scene graph you mutate. Formulas in modeling packages are the
+older version of the same move. R's frameworks, when they work, look like
+grammars.
 
 **Tidy data and verbs.** Once a data frame is a relation with a
 convention for rows and columns, a whole ecology of verbs can share it.

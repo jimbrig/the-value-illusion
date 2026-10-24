@@ -61,14 +61,15 @@ copy a thing that was supposed to be a handle and wonder why the refresh
 did not stick. The physics will not save you from that confusion. It will
 obey whichever choice you accidentally made.
 
-Gary Bernhardt's talk
-[Boundaries](https://www.destroyallsoftware.com/talks/boundaries) names the
-larger shape: a functional core that decides, an imperative shell that
+Gary Bernhardt's
+[Boundaries](https://www.destroyallsoftware.com/talks/boundaries) talk
+(SCNA 2012) and his screencast
+[Functional Core, Imperative Shell](https://www.destroyallsoftware.com/screencasts/catalog/functional-core-imperative-shell)
+name the larger shape: a core that decides on values, a shell that
 performs effects. In R the core is values and verbs. The shell is the
 handle, the `options()` read at the edge, the handler that decides how a
-condition is shown. "Functional core, imperative shell" is not a style
-for people who dislike objects. It is a rule for where objects with
-identity are allowed to stand.
+condition is shown. The split is not a style for people who dislike
+objects. It is a rule for where objects with identity are allowed to stand.
 
 ## Dependency injection without the enterprise voice
 

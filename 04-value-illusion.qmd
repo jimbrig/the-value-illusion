@@ -181,9 +181,11 @@ job.
 
 Haskell's `ST` monad is the typed version of the same instinct. The paper
 is Launchbury and Peyton Jones, "Lazy Functional State Threads" (POPL
-1994): you may mutate inside a scope, and `runST` will not let the
-mutable references escape, so the outside world still sees a pure
-function. R can imitate the pattern --- scratch environment in, list or
+1994). The encapsulation is not a runtime fence. It is the rank-2 type of
+`runST`, roughly "for all states `s`, an `ST s a` computation yields an
+`a`." A mutable reference that mentions `s` cannot escape, so the outside
+world still sees a pure function. The weaker type `ST s a -> a` would not
+do that job. R can imitate the pattern --- scratch environment in, list or
 S7 value out --- and has no type system that can enforce the boundary.
 The fence is a convention you write down. Package code that returns the
 handle by accident has broken the fence, and nothing in the language will

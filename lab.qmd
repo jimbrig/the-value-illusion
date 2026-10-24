@@ -28,8 +28,9 @@ vector, cons chain.
 
 `NULL`, `c()`, and `pairlist()` shared an address, type 0, `REF(65535)`.
 `identical()` stayed true under the strict switches, including
-`extptr.as.ref = TRUE`. The comment drew the natural conclusion: any
-genuinely empty thing is that cell.
+`extptr.as.ref = TRUE`. That flag does not speak to this comparison:
+`NULL` and `c()` are not external pointers. The comment drew the natural
+conclusion anyway: any genuinely empty thing is that cell.
 
 `list()` and `alist()` retired the conclusion for generic vectors. Each
 was a fresh length-zero `VECSXP`. `integer()`, `double()`, `character()`,
